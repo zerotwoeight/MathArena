@@ -34,13 +34,14 @@ const EFFECTS = {
       : { message: '📦 Wooden Chest! …but your hand is full.', fx: { handFull: true } };
   },
 
+  // +1 action this turn (which pays back the action spent buying it) + a free card.
   iron_chest(gs, playerId) {
-    gs.grantExtraTurn(playerId);
+    gs.actionsLeft += 1;
     const pile = Math.random() < 0.5 ? 'attack' : 'build';
     const card = gs.giveFreeCard(playerId, pile);
     return card
-      ? { message: `🗃️ Iron Chest! Extra turn + free ${card.sub} ${card.icon}!`, fx: { gained: [card.id] } }
-      : { message: '🗃️ Iron Chest! Extra turn! (Hand full — no free card.)', fx: { handFull: true } };
+      ? { message: `🗃️ Iron Chest! +1 action + free ${card.sub} ${card.icon}!`, fx: { gained: [card.id], extraAction: true } }
+      : { message: '🗃️ Iron Chest! +1 action! (Hand full — no free card.)', fx: { handFull: true, extraAction: true } };
   },
 
   purple_potion(gs, playerId, _card, resolveCorrect) {

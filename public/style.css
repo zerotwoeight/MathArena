@@ -1034,3 +1034,6 @@ html, body {
 .fx-icon-pop img   { width: clamp(140px, 42vw, 300px); height: auto; display: block; }
 /* Card backs: the stone frame is thicker, so keep text inside its opening */
 .art-card .ac-frame-back + .ac-content { inset: 11.5% 14.5% 11.5% 14.5%; }
+/* Shop: make room for three full-size card backs */
+.shop-panel { width: min(96vw, 680px); }
+.shop-piles .pile-card { width: min(var(--pile-w), calc((min(96vw, 680px) - 110px) / 3)); }

@@ -352,12 +352,17 @@ class GameState {
     const correct = card && answer === card.answer;
 
     if (!correct) {
+      // Red Potion is lost along with the card — getting it wrong should sting.
+      const potionLost = this.activeEffects[playerId].doublePower;
+      this.activeEffects[playerId].doublePower = false;
       this._useAction();
       return {
         type: 'error',
-        message: `✗ Wrong! Attack failed. The answer was ${card?.answer}.`,
+        message: potionLost
+          ? `✗ Wrong! Attack failed — and your 🧪 Red Potion is gone! The answer was ${card?.answer}.`
+          : `✗ Wrong! Attack failed. The answer was ${card?.answer}.`,
         stateUpdated: true,
-        fx: { kind: 'wrong', answer: card?.answer },
+        fx: { kind: 'wrong', answer: card?.answer, potionLost },
       };
     }
 

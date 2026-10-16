@@ -60,7 +60,7 @@ const BLD_SUBS = [
 const WILD_DEFS = [
   { effect: 'red_potion',  name: 'Red Potion',    icon: '🧪', desc: 'Next attack destroys target wall + one adjacent wall.' },
   { effect: 'wooden_chest',name: 'Wooden Chest',  icon: '📦', desc: 'Free attack card added to hand.' },
-  { effect: 'iron_chest',  name: 'Iron Chest',    icon: '🗃️', desc: 'Extra turn + 1 free card added to hand.' },
+  { effect: 'iron_chest',  name: 'Iron Chest',    icon: '🗃️', desc: 'Extra action + 1 free card added to hand.' },
   { effect: 'purple_potion',name: 'Purple Potion',icon: '🟣', desc: 'Lose 1 random wall if wrong; safe if correct.' },
   { effect: 'gold_chest',  name: 'Gold Chest',    icon: '🏆', desc: 'Free attack card + free build card added to hand.' },
   { effect: 'red_spellbook',name: 'Red Spell Book',icon: '📕',desc: 'No math for 1 full turn — all card plays auto-resolve.' },
