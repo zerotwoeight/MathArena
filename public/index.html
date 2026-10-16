@@ -1,0 +1,1833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>⚔ Math Card Game</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ TOAST CONTAINER -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 1: LANDING -->
+<div id="s-landing" class="screen active">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(18px,5.5vw,28px);padding:clamp(16px,5vw,28px);">
+    <div>
+      <div class="logo">⚔ MATH CARD GAME ⚔</div>
+      <div class="logo-sub">Multiply · Conquer · Survive</div>
+    </div>
+    <div class="lobby-panel">
+      <button class="btn btn-gold" onclick="showScreen('s-host-setup')">Create Game</button>
+      <button class="btn btn-outline" onclick="showScreen('s-client-join')">Join Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN: HOST SETUP -->
+<div id="s-host-setup" class="screen">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(16px,5vw,24px);padding:clamp(16px,5vw,28px);">
+    <div class="logo" style="font-size:var(--fs-xl);">⚔ Create Game</div>
+    <div class="lobby-panel">
+      <input id="host-name" class="text-input" type="text" placeholder="Your name" maxlength="16" autocomplete="off">
+      <div class="diff-wrap">
+        <div class="diff-label">Difficulty</div>
+        <div class="diff-stars" id="host-diff-stars">
+          <div class="diff-star on" data-v="1">⭐</div>
+          <div class="diff-star"    data-v="2">⭐</div>
+          <div class="diff-star"    data-v="3">⭐</div>
+        </div>
+        <div class="diff-level" id="host-diff-label">Easy — No timer</div>
+      </div>
+      <button class="btn btn-gold" onclick="hostCreate()">Create Room</button>
+      <button class="btn btn-ghost" onclick="showScreen('s-landing')">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 2: HOST WAIT -->
+<div id="s-host-wait" class="screen">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(14px,4.5vw,22px);padding:clamp(16px,5vw,28px);">
+    <div class="logo" style="font-size:var(--fs-xl);">Waiting for Player 2…</div>
+    <div class="lobby-panel" style="align-items:center;gap:clamp(14px,4.5vw,20px);">
+      <div class="text-dim cinzel" style="font-size:var(--fs-xs);letter-spacing:0.14em;text-transform:uppercase;">Room Code</div>
+      <div class="room-code" id="host-room-code">----</div>
+
+      <!-- QR Code -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:clamp(6px,2vw,10px);">
+        <div id="qr-code" style="width:clamp(110px,34vw,170px);height:clamp(110px,34vw,170px);background:#fff;border-radius:8px;padding:8px;display:flex;align-items:center;justify-content:center;">
+          <!-- QR SVG injected by JS -->
+        </div>
+        <div class="text-dim" style="font-size:var(--fs-xs);">Scan to join</div>
+      </div>
+
+      <div id="host-wait-status" class="text-dim" style="font-size:var(--fs-sm);text-align:center;">Waiting for opponent to join…</div>
+
+      <div id="host-start-btn" class="hidden" style="width:100%;">
+        <button class="btn btn-gold w-full" onclick="hostStart()">Start Game →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 3: CLIENT JOIN -->
+<div id="s-client-join" class="screen">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(16px,5vw,24px);padding:clamp(16px,5vw,28px);">
+    <div class="logo" style="font-size:var(--fs-xl);">⚔ Join Game</div>
+    <div class="lobby-panel">
+      <input id="client-name" class="text-input" type="text" placeholder="Your name" maxlength="16" autocomplete="off">
+      <input id="client-code" class="text-input" type="text" placeholder="Room code (e.g. XK47)" maxlength="4"
+             autocomplete="off" style="text-transform:uppercase;letter-spacing:0.2em;font-size:var(--fs-lg);font-weight:900;text-align:center;">
+      <div class="diff-wrap">
+        <div class="diff-label">Difficulty</div>
+        <div class="diff-stars" id="client-diff-stars">
+          <div class="diff-star on" data-v="1">⭐</div>
+          <div class="diff-star"    data-v="2">⭐</div>
+          <div class="diff-star"    data-v="3">⭐</div>
+        </div>
+        <div class="diff-level" id="client-diff-label">Easy — No timer</div>
+      </div>
+      <div id="join-error" class="hidden" style="color:#ff8899;font-size:var(--fs-xs);text-align:center;"></div>
+      <button class="btn btn-gold" onclick="clientJoin()">Join Room</button>
+      <button class="btn btn-ghost" onclick="showScreen('s-landing')">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 4: CLIENT WAIT -->
+<div id="s-client-wait" class="screen">
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(14px,4.5vw,22px);padding:clamp(16px,5vw,28px);">
+    <div class="logo" style="font-size:var(--fs-xl);">Connected!</div>
+    <div class="lobby-panel" style="align-items:center;text-align:center;gap:clamp(12px,3.5vw,18px);">
+      <div class="text-dim" style="font-size:var(--fs-sm);">Waiting for host to start…</div>
+      <div id="client-wait-names" class="text-dim" style="font-size:var(--fs-xs);"></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div class="wait-dot"></div>
+        <span class="cinzel text-gold" style="font-size:var(--fs-xs);letter-spacing:0.1em;">STANDING BY</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 5: GAME -->
+<div id="s-game" class="screen">
+  <div class="game-screen">
+
+    <!-- HUD -->
+    <div class="game-hud">
+      <div style="display:flex;align-items:center;gap:clamp(6px,2vw,10px);">
+        <span class="text-dim cinzel" style="font-size:var(--fs-xs);letter-spacing:0.1em;">AP</span>
+        <div class="ap-dots" id="ap-dots">
+          <div class="ap-dot"></div>
+          <div class="ap-dot"></div>
+          <div class="ap-dot"></div>
+        </div>
+      </div>
+      <div class="turn-badge" id="turn-badge">P1's Turn</div>
+      <div style="font-size:var(--fs-xs);color:var(--text-dim);font-family:'Cinzel',serif;" id="round-label">Round 1</div>
+    </div>
+    <!-- Action log strip -->
+    <div class="action-log" id="action-log">—</div>
+
+    <!-- Enemy zone -->
+    <div class="enemy-zone">
+      <div class="zone-label" id="enemy-name-label">Enemy Walls</div>
+      <div class="wall-row" id="enemy-walls"></div>
+      <!-- Direct attack banner — visible only when all enemy walls gone and it's your turn -->
+      <div id="direct-attack-banner" class="hidden" style="
+        margin-top: clamp(8px,2.5vw,12px);
+        display: flex; justify-content: center;">
+        <button onclick="handleDirectAttack()" style="
+          font-family:'Cinzel',serif;
+          font-size:var(--fs-sm);
+          font-weight:700;
+          letter-spacing:0.1em;
+          padding:clamp(8px,2.5vw,12px) clamp(16px,5vw,28px);
+          background:linear-gradient(160deg,var(--red-hi),var(--red));
+          color:var(--text);
+          border:1.5px solid var(--red-hi);
+          border-radius:8px;
+          cursor:pointer;
+          animation:direct-pulse 1.2s ease-in-out infinite;
+        ">⚔️ Direct Attack</button>
+      </div>
+    </div>
+
+    <!-- Hand -->
+    <div class="hand-zone">
+      <div class="zone-label">Your Hand</div>
+      <div class="hand-row" id="hand-cards"></div>
+      <!-- Action buttons -->
+      <div class="action-row">
+        <button class="btn btn-outline" onclick="openShop()">Shop</button>
+        <button class="btn btn-ghost"   onclick="sendEndTurn()">Pass</button>
+      </div>
+    </div>
+
+    <!-- Own walls -->
+    <div class="own-zone">
+      <div class="zone-label" id="own-name-label">Your Walls</div>
+      <div class="wall-row" id="own-walls"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 6: SHOP -->
+<div id="s-shop" class="screen math-modal-screen">
+  <div class="modal-scrim"></div>
+  <div class="shop-panel">
+    <div class="shop-piles" id="shop-piles">
+      <!-- injected -->
+    </div>
+    <button class="btn btn-ghost" style="max-width:200px;" onclick="closeShop()">← Back</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 7: MATH MODAL (attack/build/shop draw) -->
+<div id="s-math" class="screen math-modal-screen">
+  <div class="modal-scrim"></div>
+  <div class="math-modal-inner" id="math-modal-inner">
+    <div class="math-big-card art-card atk" id="math-card"></div>
+    <div class="timer-bar-wrap" id="timer-wrap">
+      <div class="timer-bar" id="timer-bar"></div>
+    </div>
+    <input class="math-input" id="math-answer" type="number" placeholder="?" inputmode="numeric">
+    <button class="btn btn-gold w-full" onclick="submitMath()">Solve →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 8: WILD DRAW -->
+<div id="s-wild-draw" class="screen math-modal-screen">
+  <div class="modal-scrim" style="background:rgba(4,5,8,0.92);"></div>
+  <div class="math-modal-inner">
+    <div class="math-big-card art-card wld" id="wild-draw-card"></div>
+    <div class="timer-bar-wrap" id="wild-draw-timer-wrap">
+      <div class="timer-bar" id="wild-draw-timer-bar"></div>
+    </div>
+    <input class="math-input" id="wild-draw-answer" type="number" placeholder="?" inputmode="numeric">
+    <button class="btn btn-gold w-full" onclick="submitWildDraw()">Solve →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 9: WILD RESOLVE -->
+<div id="s-wild-resolve" class="screen math-modal-screen">
+  <div class="modal-scrim" style="background:rgba(4,5,8,0.92);"></div>
+  <div class="math-modal-inner">
+    <div class="math-big-card art-card wld" id="wild-resolve-card"></div>
+    <div class="timer-bar-wrap" id="wild-resolve-timer-wrap">
+      <div class="timer-bar" id="wild-resolve-timer-bar"></div>
+    </div>
+    <input class="math-input" id="wild-resolve-answer" type="number" placeholder="?" inputmode="numeric">
+    <button class="btn btn-gold w-full" onclick="submitWildResolve()">Solve →</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 10: WAITING (OPPONENT TURN) -->
+<div id="s-waiting" class="screen">
+  <div class="wait-screen">
+    <div class="wait-enemy-section">
+      <div class="wait-avatar" id="wait-enemy-avatar">🧙</div>
+      <div class="wait-name" id="wait-enemy-name">Opponent</div>
+      <div class="wait-badge">
+        <div class="wait-dot"></div>
+        Their Turn
+      </div>
+    </div>
+    <div class="wait-walls-section">
+      <div class="wait-walls-label">Your Walls</div>
+      <div class="wall-row" id="wait-own-walls"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN 11: GAME OVER -->
+<div id="s-gameover" class="screen">
+  <div style="display:flex;align-items:center;justify-content:center;height:100%;padding:clamp(16px,5vw,28px);">
+    <div class="gameover-panel">
+      <div class="gameover-title" id="gameover-title">Victory!</div>
+      <div class="gameover-sub" id="gameover-sub">You defeated your opponent!</div>
+      <button class="btn btn-gold" onclick="location.reload()">Play Again</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SOCKET.IO -->
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+const socket = io();
+let myPlayerId = null;
+let myDifficulty = 1;
+let gameState = null;
+let pendingChallenge = null;  // { card, action, context }
+let timerInterval = null;
+let timerSeconds = 0;
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SOUND
+// ═══════════════════════════════════════════════════════════════════════════
+const SFX = (() => {
+  const files = {
+    select: 'cardSelect', submit: 'Submit', positive: 'Positive', negative: 'Negitive',
+    sword: 'Hit-Sword', gun: 'Hit-Gun', hammer: 'Hit-Hammer', wallBreak: 'WallBreak',
+  };
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = AC ? new AC() : null;
+  const buffers = {};
+  const tags = {};
+  let muted = false;
+  try { muted = localStorage.getItem('mcg-muted') === '1'; } catch (e) {}
+
+  Object.entries(files).forEach(([key, file]) => {
+    const url = `/aud/${file}.mp3`;
+    if (!ctx) { tags[key] = new Audio(url); return; }
+    fetch(url)
+      .then(r => r.arrayBuffer())
+      .then(buf => new Promise((res, rej) => {
+        const pr = ctx.decodeAudioData(buf, res, rej); // callback form for older iPad Safari
+        if (pr && pr.catch) pr.catch(rej);
+      }))
+      .then(decoded => { buffers[key] = decoded; })
+      .catch(() => { tags[key] = new Audio(url); });
+  });
+
+  // iPad blocks audio until the first touch — resume the context then.
+  const unlock = () => { if (ctx && ctx.state === 'suspended') ctx.resume(); };
+  ['pointerdown', 'touchstart', 'keydown'].forEach(ev =>
+    document.addEventListener(ev, unlock, { passive: true, capture: true }));
+
+  function play(key, volume = 1) {
+    if (muted) return;
+    if (ctx && buffers[key]) {
+      const src = ctx.createBufferSource();
+      src.buffer = buffers[key];
+      const gain = ctx.createGain();
+      gain.gain.value = volume;
+      src.connect(gain);
+      gain.connect(ctx.destination);
+      src.start(0);
+      return;
+    }
+    const tag = tags[key];
+    if (tag) {
+      const c = tag.cloneNode();
+      c.volume = volume;
+      c.play().catch(() => {});
+    }
+  }
+  function setMuted(m) {
+    muted = m;
+    try { localStorage.setItem('mcg-muted', m ? '1' : '0'); } catch (e) {}
+  }
+  return { play, setMuted, isMuted: () => muted };
+})();
+
+const WEAPON_SFX = { Sword: 'sword', Gun: 'gun', Hammer: 'hammer' };
+
+// Mute button (fixed, top-right)
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = document.createElement('button');
+  btn.className = 'mute-btn';
+  btn.id = 'mute-btn';
+  const sync = () => { btn.textContent = SFX.isMuted() ? '🔇' : '🔊'; };
+  sync();
+  btn.addEventListener('click', () => { SFX.setMuted(!SFX.isMuted()); sync(); if (!SFX.isMuted()) SFX.play('select'); });
+  document.body.appendChild(btn);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  FX HELPERS
+// ═══════════════════════════════════════════════════════════════════════════
+const REDUCED_MOTION = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const centerOf = el => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, r }; };
+
+// Web Animations wrapper that always resolves (even if cancelled)
+function anim(el, frames, opts = {}) {
+  if (!el || !el.animate) return Promise.resolve();
+  if (REDUCED_MOTION) opts = { ...opts, duration: Math.min(opts.duration || 300, 160) };
+  try { return el.animate(frames, opts).finished.catch(() => {}); }
+  catch (e) { return Promise.resolve(); }
+}
+function cancelAnims(el) { el?.getAnimations?.().forEach(a => a.cancel()); }
+
+// Particle burst from a point
+function burst(x, y, {
+  count = 16, colors = ['#e8c84e', '#fff6c0', '#c8a428', '#ffffff'],
+  size = [5, 11], dist = [60, 170], dur = 750, square = false, gravity = 0, text = null,
+} = {}) {
+  if (REDUCED_MOTION) return;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'fx-particle';
+    const s = rnd(size[0], size[1]);
+    if (text) {
+      p.textContent = text;
+      p.style.cssText = `left:${x}px;top:${y}px;font-size:${s * 2}px;color:${pick(colors)};margin:${-s}px 0 0 ${-s / 2}px;`;
+    } else {
+      p.style.cssText = `left:${x}px;top:${y}px;width:${s}px;height:${s * (square ? rnd(0.6, 1.6) : 1)}px;` +
+        `margin:${-s / 2}px 0 0 ${-s / 2}px;background:${pick(colors)};border-radius:${square ? '2px' : '50%'};`;
+    }
+    document.body.appendChild(p);
+    const ang = Math.random() * Math.PI * 2;
+    const d = rnd(dist[0], dist[1]);
+    const dx = Math.cos(ang) * d;
+    const dy = Math.sin(ang) * d + gravity;
+    p.animate([
+      { transform: 'translate(0,0) scale(1) rotate(0deg)', opacity: 1 },
+      { transform: `translate(${dx}px,${dy}px) scale(0.3) rotate(${rnd(-540, 540)}deg)`, opacity: 0 },
+    ], { duration: dur * rnd(0.7, 1.25), easing: 'cubic-bezier(.2,.7,.4,1)' })
+      .finished.then(() => p.remove(), () => p.remove());
+  }
+}
+
+function screenShake(px = 8, dur = 420) {
+  if (REDUCED_MOTION) return;
+  const el = document.querySelector('.screen.active');
+  if (!el) return;
+  const frames = [];
+  for (let i = 0; i < 8; i++) frames.push({ transform: `translate(${rnd(-px, px)}px,${rnd(-px, px)}px)` });
+  frames.push({ transform: 'translate(0,0)' });
+  el.animate(frames, { duration: dur, easing: 'ease-out' });
+}
+
+function screenFlash(color = 'rgba(255,255,255,0.5)', dur = 350) {
+  const f = document.createElement('div');
+  f.className = 'fx-flash';
+  f.style.background = color;
+  document.body.appendChild(f);
+  anim(f, [{ opacity: 1 }, { opacity: 0 }], { duration: dur, easing: 'ease-out' }).then(() => f.remove());
+}
+
+const WALL_COLORS = {
+  Stone: ['#8a8f99', '#5c616b', '#b8bcc4', '#3e434c'],
+  Wood:  ['#8b5a2b', '#5e3a17', '#c08a50', '#3f2710'],
+  Gem:   ['#4f7bff', '#9bb6ff', '#1c38b0', '#e0e8ff'],
+};
+function wallTypeOf(wallEl) {
+  return wallEl?.dataset?.wallType || 'Stone';
+}
+function shards(x, y, type) {
+  burst(x, y, { count: 22, colors: WALL_COLORS[type] || WALL_COLORS.Stone, size: [6, 16], dist: [50, 190], dur: 900, square: true, gravity: 90 });
+}
+
+// A card icon flung at a point (from the hand, or from the top for the opponent's attacks)
+function makeProjectile(icon, fromTop, img) {
+  const p = document.createElement('div');
+  p.className = 'fx-projectile';
+  if (img) p.innerHTML = `<img src="${img}" alt="">`;
+  else p.textContent = icon || '⚔️';
+  const sx = window.innerWidth / 2;
+  const sy = fromTop ? -60 : window.innerHeight * 0.72;
+  p.style.left = sx + 'px';
+  p.style.top = sy + 'px';
+  p.style.transform = 'translate(-50%,-50%)';
+  document.body.appendChild(p);
+  return { el: p, sx, sy };
+}
+async function flyProjectile(proj, tx, ty) {
+  const dx = tx - proj.sx, dy = ty - proj.sy;
+  await anim(proj.el, [
+    { transform: 'translate(-50%,-50%) scale(0.6) rotate(0deg)', opacity: 0.4 },
+    { transform: `translate(calc(-50% + ${dx * 0.5}px), calc(-50% + ${dy * 0.5 - 60}px)) scale(1.3) rotate(-200deg)`, opacity: 1, offset: 0.5 },
+    { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1.1) rotate(-400deg)`, opacity: 1 },
+  ], { duration: REDUCED_MOTION ? 1 : 380, easing: 'cubic-bezier(.5,0,.9,.6)', fill: 'forwards' });
+  return { dx, dy };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  GAME FX SEQUENCES
+// ═══════════════════════════════════════════════════════════════════════════
+// Walls we've already animated ourselves — renderWalls skips its own flash for these.
+const suppressFlash = new Set();
+
+async function breakWall(wallEl, containerId, idx) {
+  suppressFlash.add(`${containerId}:${idx}`);
+  const { x, y } = centerOf(wallEl);
+  shards(x, y, wallTypeOf(wallEl));
+  await anim(wallEl, [
+    { transform: 'scale(1.15) rotate(-4deg)', filter: 'brightness(2.4)', opacity: 1 },
+    { transform: 'scale(0.55) rotate(10deg) translateY(20px)', filter: 'brightness(0.6) grayscale(1)', opacity: 0 },
+  ], { duration: 380, easing: 'ease-in', fill: 'forwards' });
+}
+
+async function fxSmash(wallEl, fx, containerId, fromTop) {
+  const { x, y } = centerOf(wallEl);
+  const proj = makeProjectile(fx.cardIcon, fromTop, IMG[fx.cardSub]);
+  await flyProjectile(proj, x, y);
+  proj.el.remove();
+  SFX.play(WEAPON_SFX[fx.cardSub] || 'sword');
+  burst(x, y, { count: 10, colors: ['#fff', '#ffe08a'], dist: [30, 80], dur: 350 });
+  await anim(wallEl, [
+    { transform: 'scale(1)', filter: 'brightness(1)' },
+    { transform: 'scale(1.18) rotate(-5deg)', filter: 'brightness(2.6)' },
+    { transform: 'scale(0.95) rotate(4deg)', filter: 'brightness(1.5)' },
+  ], { duration: 200, fill: 'forwards' });
+  SFX.play('wallBreak', 0.9);
+  screenShake(10, 450);
+  const jobs = [breakWall(wallEl, containerId, fx.target)];
+  if (fx.also >= 0) {
+    const second = document.querySelectorAll(`#${containerId} .wall-card`)[fx.also];
+    if (second) jobs.push(wait(160).then(() => breakWall(second, containerId, fx.also)));
+  }
+  await Promise.all(jobs);
+}
+
+async function fxBlocked(wallEl, fx, fromTop) {
+  const { x, y } = centerOf(wallEl);
+  const proj = makeProjectile(fx.cardIcon, fromTop, IMG[fx.cardSub]);
+  const { dx, dy } = await flyProjectile(proj, x, y);
+  SFX.play(WEAPON_SFX[fx.cardSub] || 'sword');
+  burst(x, y, { count: 8, colors: ['#cfd6e0', '#ffffff'], dist: [20, 60], dur: 300 });
+  // Wall holds firm — a stubborn little shudder + steel glint
+  anim(wallEl, [
+    { transform: 'translateX(0)', filter: 'brightness(1)' },
+    { transform: 'translateX(-6px)', filter: 'brightness(1.8) saturate(0)' },
+    { transform: 'translateX(5px)' }, { transform: 'translateX(-3px)' },
+    { transform: 'translateX(0)', filter: 'brightness(1)' },
+  ], { duration: 320 });
+  // Card bounces off and tumbles away
+  const bx = dx + rnd(-90, 90), by = dy + (fromTop ? -140 : 140);
+  await anim(proj.el, [
+    { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(1.1) rotate(-400deg)`, opacity: 1 },
+    { transform: `translate(calc(-50% + ${bx}px), calc(-50% + ${by}px)) scale(0.5) rotate(-40deg)`, opacity: 0 },
+  ], { duration: 520, easing: 'cubic-bezier(.2,.8,.4,1)', fill: 'forwards' });
+  proj.el.remove();
+}
+
+async function fxDirect(fx, mine) {
+  const banner = document.getElementById('direct-attack-banner');
+  const target = mine && banner && !banner.classList.contains('hidden')
+    ? centerOf(banner) : { x: window.innerWidth / 2, y: window.innerHeight * 0.4 };
+  const proj = makeProjectile(fx.cardIcon, !mine, IMG[fx.cardSub]);
+  await flyProjectile(proj, target.x, target.y);
+  proj.el.remove();
+  SFX.play(WEAPON_SFX[fx.cardSub] || 'sword');
+  SFX.play('wallBreak');
+  screenFlash(mine ? 'rgba(232,200,78,0.55)' : 'rgba(176,30,44,0.6)', 600);
+  screenShake(18, 700);
+  burst(target.x, target.y, { count: 40, dist: [80, 280], dur: 1000 });
+  await wait(700);
+}
+
+// Correct / wrong on the big math card
+let awaiting = null; // { cardEl, screenEl, timeout }
+
+function beginAwait(screenEl) {
+  const cardEl = screenEl?.querySelector('.math-big-card');
+  const input = screenEl?.querySelector('.math-input');
+  if (input) { input.disabled = true; input.blur(); }
+  if (!cardEl) return;
+  cardEl.classList.remove('urgent');
+  cardEl.classList.add('awaiting');
+  SFX.play('submit');
+  awaiting = { cardEl, screenEl };
+  // Safety net: never leave the modal stuck if the server doesn't answer
+  awaiting.timeout = setTimeout(() => {
+    if (awaiting?.cardEl === cardEl) { endAwait(); closeModal(); }
+  }, 5000);
+}
+function endAwait() {
+  if (!awaiting) return null;
+  clearTimeout(awaiting.timeout);
+  const a = awaiting;
+  awaiting = null;
+  a.cardEl.classList.remove('awaiting', 'urgent');
+  const input = a.screenEl?.querySelector('.math-input');
+  if (input) input.disabled = false;
+  return a;
+}
+
+async function fxAnswerResult(fx) {
+  const a = endAwait();
+  if (!a) return;
+  const { cardEl } = a;
+  const { x, y } = centerOf(cardEl);
+  if (fx.kind !== 'wrong') {
+    SFX.play('positive');
+    burst(x, y, { count: 26, dist: [90, 240], dur: 900 });
+    burst(x, y, { count: 8, text: '✦', colors: ['#e8c84e', '#fff6c0'], size: [8, 14], dist: [70, 200], dur: 1000 });
+    await anim(cardEl, [
+      { transform: 'scale(1)', opacity: 1, filter: 'brightness(1)', boxShadow: '0 0 0 rgba(232,200,78,0)' },
+      { transform: 'scale(1.18)', opacity: 1, filter: 'brightness(1.5)', boxShadow: '0 0 50px rgba(232,200,78,1)', offset: 0.35 },
+      { transform: 'scale(1.5)', opacity: 0, filter: 'brightness(2.2)', boxShadow: '0 0 80px rgba(232,200,78,0)' },
+    ], { duration: 700, easing: 'ease-out', fill: 'forwards' });
+  } else {
+    SFX.play('negative');
+    screenFlash('rgba(176,30,44,0.35)', 400);
+    await anim(cardEl, [
+      { transform: 'translateX(0) rotate(0)', opacity: 1, filter: 'none' },
+      { transform: 'translateX(-18px) rotate(-3deg)', filter: 'sepia(1) saturate(5) hue-rotate(-50deg)', offset: 0.1 },
+      { transform: 'translateX(16px) rotate(3deg)', offset: 0.22 },
+      { transform: 'translateX(-12px) rotate(-2deg)', offset: 0.34 },
+      { transform: 'translateX(9px) rotate(1deg)', offset: 0.46 },
+      { transform: 'translateX(-5px)', opacity: 0.9, offset: 0.58 },
+      { transform: 'translateX(0) translateY(30px) scale(0.85)', opacity: 0, filter: 'sepia(1) saturate(5) hue-rotate(-50deg) grayscale(0.5)' },
+    ], { duration: 750, easing: 'ease-out', fill: 'forwards' });
+    await showAnswerReveal(fx.answer);
+  }
+  if (!fx.next) closeModal();
+}
+
+async function showAnswerReveal(answer) {
+  if (answer === undefined || answer === null) return;
+  const d = document.createElement('div');
+  d.className = 'answer-reveal';
+  d.innerHTML = `<div class="ar-lbl">The answer was</div><div class="ar-num"></div>`;
+  d.querySelector('.ar-num').textContent = answer;
+  document.body.appendChild(d);
+  await anim(d.querySelector('.ar-num'), [
+    { transform: 'scale(0.3)', opacity: 0 },
+    { transform: 'scale(1.15)', opacity: 1, offset: 0.55 },
+    { transform: 'scale(1)', opacity: 1 },
+  ], { duration: 420, easing: 'ease-out' });
+  await wait(1200);
+  await anim(d, [{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' });
+  d.remove();
+}
+
+// Master dispatcher for an action_result
+async function playFx({ actor, fx }) {
+  if (!fx) return;
+  const mine = actor === myPlayerId;
+  if (mine && awaiting) await fxAnswerResult(fx);
+
+  if (fx.kind === 'smash' || fx.kind === 'blocked') {
+    await wait(80);
+    const containerId = mine
+      ? 'enemy-walls'
+      : (document.getElementById('s-waiting').classList.contains('active') ? 'wait-own-walls' : 'own-walls');
+    const wallEl = document.querySelectorAll(`#${containerId} .wall-card`)[fx.target];
+    if (!wallEl) return;
+    if (fx.kind === 'smash') await fxSmash(wallEl, fx, containerId, !mine);
+    else await fxBlocked(wallEl, fx, !mine);
+  } else if (fx.kind === 'direct') {
+    await fxDirect(fx, mine);
+  } else if (fx.kind === 'wild' || (fx.kind === 'wrong' && fx.effect)) {
+    await fxWild(fx, mine, actor);
+  }
+  if (mine && fx.potionLost) await fxPotionLost();
+  if (mine && fx.gained) fx.gained.forEach(id => giftIds.add(id));
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CARD ART
+// ═══════════════════════════════════════════════════════════════════════════
+const IMG = {
+  Sword: '/img/Attack-Sword.png', Gun: '/img/Attack-Gun.png', Hammer: '/img/Attack-Hammer.png',
+  Stone: '/img/Wall-Stone.png', Wood: '/img/Wall-Wood.png', Gem: '/img/Wall-Gem.png',
+  red_potion: '/img/Wild-RedPotion.png', wooden_chest: '/img/Wild-WoodenChest.png',
+  iron_chest: '/img/Wild-IronChest.png', purple_potion: '/img/Wild-PurplePotion.png',
+  gold_chest: '/img/Wild-GoldChest.png', red_spellbook: '/img/Wild-RedBook.png',
+  poison_drink: '/img/Wild-PoisonDrink.png', armory: '/img/Wild-Armory.png',
+  looking_glass: '/img/Wild-LookingGlass.png',
+};
+const WALL_HINT = {
+  Stone: 'Strong against Hammers',
+  Wood:  'Strong against Swords',
+  Gem:   'Strong against Guns',
+};
+// Preload everything so cards never pop in blank
+['/img/CardFront-Border.png', '/img/CardBack-Border.png', ...Object.values(IMG)]
+  .forEach(src => { const i = new Image(); i.src = src; });
+
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/**
+ * Builds the layered inside of a card.
+ *  kind: 'atk' | 'bld' | 'wall' | 'wld' | 'back'
+ *  opts: { art, eq, name, hint, dead, tone }  (tone = 'atk'|'bld'|'wld' for backs)
+ */
+function cardFace(kind, { art, eq, name, hint, dead, tone } = {}) {
+  if (kind === 'back') {
+    return `<div class="ac-bg ac-bg-${tone || 'wld'}"></div>
+      <div class="ac-q">?</div>
+      <div class="ac-frame ac-frame-back"></div>
+      <div class="ac-content">${eq ? `<div class="ac-plate">${esc(eq)}</div>` : ''}${name ? `<div class="ac-name">${esc(name)}</div>` : ''}</div>`;
+  }
+  const textured = kind === 'bld' || kind === 'wall';
+  const bg = textured
+    ? `<div class="ac-bg ac-tex${dead ? ' ac-dead' : ''}${kind === 'bld' ? ' ac-dim' : ''}" style="background-image:url('${art}')"></div>`
+    : `<div class="ac-bg ac-bg-${kind}"></div><div class="ac-art" style="background-image:url('${art}')"></div>`;
+  return `${bg}
+    <div class="ac-frame${dead ? ' ac-dead' : ''}"></div>
+    <div class="ac-content ac-${kind}">
+      ${eq ? `<div class="ac-plate">${esc(eq)}</div>` : ''}
+      ${name ? `<div class="ac-name">${esc(name)}</div>` : ''}
+      ${hint ? `<div class="ac-hint">${esc(hint)}</div>` : ''}
+    </div>`;
+}
+
+// Convenience builders
+function faceForCard(card) {
+  if (card.type === 'attack') return cardFace('atk', { art: IMG[card.sub], eq: card.eq, name: card.sub });
+  if (card.type === 'build')  return cardFace('bld', { art: IMG[card.sub], eq: card.eq, name: card.sub, hint: WALL_HINT[card.sub] });
+  return cardFace('wld', { art: IMG[card.effect], eq: card.resolveEq, name: card.name });
+}
+function faceForWall(wall) {
+  return cardFace('wall', {
+    art: IMG[wall.type], name: wall.type, dead: !wall.active,
+    hint: wall.active ? WALL_HINT[wall.type] : 'Destroyed',
+  });
+}
+
+// ─── Wild card effects ───────────────────────────────────────────────────────
+const giftIds = new Set(); // cards that should fly into the hand on next render
+
+function iconPop(icon, ring, img) {
+  const d = document.createElement('div');
+  d.className = 'fx-icon-pop';
+  if (img) d.innerHTML = `<img src="${img}" alt="">`;
+  else d.textContent = icon;
+  if (ring) d.style.filter = `drop-shadow(0 0 30px ${ring})`;
+  document.body.appendChild(d);
+  return anim(d, [
+    { transform: 'translate(-50%,-50%) scale(0.2) rotate(-20deg)', opacity: 0 },
+    { transform: 'translate(-50%,-50%) scale(1.25) rotate(6deg)', opacity: 1, offset: 0.35 },
+    { transform: 'translate(-50%,-50%) scale(1) rotate(0)', opacity: 1, offset: 0.7 },
+    { transform: 'translate(-50%,-60%) scale(1.4)', opacity: 0 },
+  ], { duration: 1100, easing: 'ease-out', fill: 'forwards' }).then(() => d.remove());
+}
+
+const WILD_LOOK = {
+  red_potion:    { glow: 'rgba(255,40,60,0.9)',  flash: 'rgba(176,30,44,0.45)', colors: ['#ff4757', '#ff9aa5', '#b01e2c'] },
+  red_spellbook: { glow: 'rgba(232,200,78,0.9)', flash: 'rgba(232,200,78,0.4)', colors: ['#e8c84e', '#fff6c0', '#ff9f1c'] },
+  wooden_chest:  { glow: 'rgba(192,138,80,0.9)', colors: ['#e8c84e', '#c08a50', '#fff6c0'] },
+  iron_chest:    { glow: 'rgba(184,188,196,0.9)', colors: ['#e8c84e', '#b8bcc4', '#ffffff'] },
+  gold_chest:    { glow: 'rgba(255,215,0,1)',    flash: 'rgba(232,200,78,0.35)', colors: ['#ffd700', '#fff6c0', '#e8c84e'] },
+  armory:        { glow: 'rgba(30,122,52,0.9)',  colors: ['#6effa0', '#1e7a34', '#c8f5d4'] },
+  looking_glass: { glow: 'rgba(170,90,255,0.95)', flash: 'rgba(110,40,200,0.35)', colors: ['#c39bff', '#7b3fe4', '#ffffff'] },
+  purple_potion: { glow: 'rgba(170,90,255,0.95)', colors: ['#c39bff', '#7b3fe4', '#ffffff'] },
+  poison_drink:  { glow: 'rgba(80,255,80,0.9)',  flash: 'rgba(40,160,40,0.4)', colors: ['#6eff6e', '#2e9e2e', '#c8ffb0'] },
+};
+
+async function fxWild(fx, mine, actor) {
+  const look = WILD_LOOK[fx.effect] || { glow: 'rgba(28,56,176,0.9)', colors: ['#9bb6ff', '#ffffff'] };
+
+  if (!mine) {
+    // Opponent: short banner so they know what happened
+    const who = gameState?.players?.[actor]?.name || 'Opponent';
+    let text = `${who}: ${fx.icon} ${fx.name}`;
+    if (fx.effect === 'looking_glass' && fx.stolen) {
+      text = `🔮 ${who} stole ${fx.stolen} of your cards!`;
+      SFX.play('negative');
+      screenFlash('rgba(110,40,200,0.35)', 500);
+    }
+    showTurnBanner(text, true);
+    await wait(500);
+    return;
+  }
+
+  const cx = window.innerWidth / 2, cy = window.innerHeight * 0.42;
+  if (look.flash) screenFlash(look.flash, 600);
+  const pop = iconPop(fx.icon, look.glow, IMG[fx.effect]);
+  burst(cx, cy, { count: 30, colors: look.colors, dist: [90, 260], dur: 1000 });
+  burst(cx, cy, { count: 10, text: '✦', colors: look.colors, size: [8, 14], dist: [80, 220], dur: 1100 });
+
+  if (fx.effect === 'poison_drink' || (fx.effect === 'purple_potion' && !fx.safe)) {
+    SFX.play('negative', 0.7);
+    // Toxic haze rolls over your walls; the wall-break plays when the board updates
+    const own = document.getElementById('own-walls');
+    if (own && !REDUCED_MOTION) {
+      const { x, y } = centerOf(own);
+      burst(x, y, { count: 26, colors: ['rgba(110,255,110,0.6)', 'rgba(40,160,40,0.5)', 'rgba(200,255,180,0.5)'], size: [18, 36], dist: [30, 140], dur: 1300, gravity: -60 });
+    }
+  } else if (fx.effect === 'purple_potion' && fx.safe) {
+    document.querySelectorAll('#own-walls .wall-card:not(.dead)').forEach((w, i) =>
+      anim(w, [
+        { filter: 'brightness(1)', boxShadow: '0 0 0 rgba(120,160,255,0)' },
+        { filter: 'brightness(1.6) hue-rotate(20deg)', boxShadow: '0 0 26px rgba(120,160,255,1)', offset: 0.4 },
+        { filter: 'brightness(1)', boxShadow: '0 0 0 rgba(120,160,255,0)' },
+      ], { duration: 900, delay: i * 120 }));
+  } else if (fx.effect === 'red_potion') {
+    SFX.play('positive', 0.6);
+  } else if (fx.effect === 'red_spellbook') {
+    SFX.play('positive', 0.6);
+  } else if (fx.handFull) {
+    toast('Your hand is full!', 'info');
+  }
+  await pop;
+}
+
+// Red Potion lost on a wrong power attack: the potion shatters
+async function fxPotionLost() {
+  const cx = window.innerWidth / 2, cy = window.innerHeight * 0.42;
+  const d = document.createElement('div');
+  d.className = 'fx-icon-pop';
+  d.innerHTML = `<img src="${IMG.red_potion}" alt="">`;
+  document.body.appendChild(d);
+  SFX.play('wallBreak', 0.7);
+  await anim(d, [
+    { transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0, filter: 'drop-shadow(0 0 30px rgba(255,40,60,1))' },
+    { transform: 'translate(-50%,-50%) scale(1.2) rotate(-8deg)', opacity: 1, offset: 0.3 },
+    { transform: 'translate(-50%,-50%) scale(1.1) rotate(10deg)', opacity: 1, offset: 0.5 },
+    { transform: 'translate(-50%,-50%) scale(1.1) rotate(-10deg)', opacity: 1, offset: 0.65 },
+  ], { duration: 650, easing: 'ease-out', fill: 'forwards' });
+  burst(cx, cy, { count: 30, colors: ['#ff4757', '#ff9aa5', '#b01e2c', '#ffffff'], size: [6, 14], dist: [60, 220], dur: 900, square: true, gravity: 120 });
+  screenFlash('rgba(176,30,44,0.4)', 450);
+  screenShake(8, 380);
+  d.remove();
+  showTurnBanner('🧪 POTION LOST!', true);
+  await wait(900);
+}
+
+// Things that land on a target: wobble it, remember where (for the zoom-in)
+let lastDropPoint = null;
+function hitTarget(el) {
+  if (!el) return;
+  lastDropPoint = centerOf(el);
+  SFX.play('select', 0.7);
+  anim(el, [
+    { transform: 'scale(1.1) rotate(0)' }, { transform: 'scale(1.1) rotate(-6deg)' },
+    { transform: 'scale(1.1) rotate(5deg)' }, { transform: 'scale(1.05) rotate(-3deg)' },
+    { transform: 'scale(1) rotate(0)' },
+  ], { duration: 320 });
+}
+
+// Card intro on the math modal
+function introMathCard(screenEl, mode) {
+  const cardEl = screenEl.querySelector('.math-big-card');
+  if (!cardEl) return;
+  cancelAnims(cardEl);
+  cardEl.classList.remove('awaiting', 'urgent');
+  const input = screenEl.querySelector('.math-input');
+  if (input) input.disabled = false;
+  if (mode === 'zoom' && lastDropPoint) {
+    const c = centerOf(cardEl);
+    const dx = lastDropPoint.x - c.x, dy = lastDropPoint.y - c.y;
+    anim(cardEl, [
+      { transform: `translate(${dx}px,${dy}px) scale(0.25) rotate(-12deg)`, opacity: 0.5 },
+      { transform: 'translate(0,0) scale(1.06) rotate(2deg)', opacity: 1, offset: 0.7 },
+      { transform: 'translate(0,0) scale(1) rotate(0)', opacity: 1 },
+    ], { duration: 480, easing: 'cubic-bezier(.3,1,.5,1)' });
+  } else {
+    SFX.play('select');
+    anim(cardEl, [
+      { transform: 'perspective(900px) rotateY(-90deg) scale(0.7)', filter: 'brightness(0.3)' },
+      { transform: 'perspective(900px) rotateY(12deg) scale(1.04)', filter: 'brightness(1.3)', offset: 0.65 },
+      { transform: 'perspective(900px) rotateY(0deg) scale(1)', filter: 'brightness(1)' },
+    ], { duration: 560, easing: 'ease-out' });
+  }
+  lastDropPoint = null;
+}
+
+// "YOUR TURN" sweep
+function showTurnBanner(text, small) {
+  const b = document.createElement('div');
+  b.className = 'turn-banner' + (small ? ' small' : '');
+  b.textContent = text;
+  document.body.appendChild(b);
+  SFX.play('select');
+  (async () => {
+    await anim(b, [
+      { transform: 'translateX(-110%) skewX(-12deg)', opacity: 0 },
+      { transform: 'translateX(4%) skewX(-4deg)', opacity: 1, offset: 0.75 },
+      { transform: 'translateX(0) skewX(0)', opacity: 1 },
+    ], { duration: 420, easing: 'ease-out', fill: 'forwards' });
+    await wait(700);
+    await anim(b, [
+      { transform: 'translateX(0)', opacity: 1 },
+      { transform: 'translateX(110%) skewX(12deg)', opacity: 0 },
+    ], { duration: 350, easing: 'ease-in', fill: 'forwards' });
+    b.remove();
+  })();
+}
+
+function confetti() {
+  if (REDUCED_MOTION) return;
+  const colors = ['#e8c84e', '#b01e2c', '#1e7a34', '#1c38b0', '#ffffff', '#ff9f1c'];
+  for (let i = 0; i < 110; i++) {
+    const p = document.createElement('div');
+    p.className = 'fx-particle';
+    const w = rnd(6, 11);
+    p.style.cssText = `left:${rnd(0, window.innerWidth)}px;top:-20px;width:${w}px;height:${w * 1.6}px;background:${pick(colors)};border-radius:2px;`;
+    document.body.appendChild(p);
+    const drift = rnd(-120, 120);
+    p.animate([
+      { transform: 'translate(0,0) rotate(0deg)', opacity: 1 },
+      { transform: `translate(${drift}px, ${window.innerHeight + 60}px) rotate(${rnd(-900, 900)}deg)`, opacity: 0.9 },
+    ], { duration: rnd(2200, 4000), delay: rnd(0, 1400), easing: 'cubic-bezier(.3,.4,.6,1)', fill: 'backwards' })
+      .finished.then(() => p.remove(), () => p.remove());
+  }
+}
+
+
+// ─── Screen navigation ───────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id)?.classList.add('active');
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────────────
+function toast(message, type = 'info') {
+  const wrap = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+// ─── Difficulty stars ────────────────────────────────────────────────────────
+const DIFF_LABELS = ['', 'Easy — No timer', 'Medium — 20s', 'Hard — 10s'];
+
+function initDiffStars(wrapId, labelId, onChange) {
+  const wrap = document.getElementById(wrapId);
+  const label = document.getElementById(labelId);
+  let current = 1;
+  wrap.querySelectorAll('.diff-star').forEach(star => {
+    star.addEventListener('click', () => {
+      current = Number(star.dataset.v);
+      wrap.querySelectorAll('.diff-star').forEach(s => s.classList.toggle('on', Number(s.dataset.v) <= current));
+      label.textContent = DIFF_LABELS[current];
+      onChange(current);
+    });
+  });
+  return () => current;
+}
+
+let getHostDiff, getClientDiff;
+document.addEventListener('DOMContentLoaded', () => {
+  getHostDiff   = initDiffStars('host-diff-stars',   'host-diff-label',   d => {});
+  getClientDiff = initDiffStars('client-diff-stars', 'client-diff-label', d => {});
+});
+
+// ─── QR Code generator (inline, no deps) ────────────────────────────────────
+function buildQR(url, size = 150) {
+  // Minimal visual QR — renders finder patterns + encoded URL text
+  // (not a standards-compliant QR; use a real lib for scan-ability)
+  // For a real deployable app, swap with qrcode.js or server-side generation
+  const s = size;
+  const cell = Math.floor(s / 21);
+  const svg = ['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150" style="width:100%;height:100%;">',
+               '<rect width="150" height="150" fill="white"/>'];
+
+  // Helper: draw a finder corner at (x,y) in cell units
+  function finder(cx, cy) {
+    const px = cx * cell, py = cy * cell;
+    svg.push(`<rect x="${px}" y="${py}" width="${cell*7}" height="${cell*7}" fill="black"/>`);
+    svg.push(`<rect x="${px+cell}" y="${py+cell}" width="${cell*5}" height="${cell*5}" fill="white"/>`);
+    svg.push(`<rect x="${px+cell*2}" y="${py+cell*2}" width="${cell*3}" height="${cell*3}" fill="black"/>`);
+  }
+  finder(0,0); finder(14,0); finder(0,14);
+
+  // Timing strips
+  for (let i = 8; i < 13; i++) {
+    if (i % 2 === 0) {
+      svg.push(`<rect x="${i*cell}" y="${6*cell}" width="${cell}" height="${cell}" fill="black"/>`);
+      svg.push(`<rect x="${6*cell}" y="${i*cell}" width="${cell}" height="${cell}" fill="black"/>`);
+    }
+  }
+
+  // Data area: pseudo-random dots derived from URL chars
+  const seed = url.split('').reduce((a,c) => a + c.charCodeAt(0), 0);
+  let r = seed;
+  for (let row = 0; row < 21; row++) {
+    for (let col = 0; col < 21; col++) {
+      // Skip finder + timing zones
+      if (row < 8 && col < 8) continue;
+      if (row < 8 && col > 12) continue;
+      if (row > 12 && col < 8) continue;
+      if (row === 6 || col === 6) continue;
+      r = (r * 1664525 + 1013904223) & 0xffffffff;
+      if (r >>> 0 > 0x7fffffff) {
+        svg.push(`<rect x="${col*cell}" y="${row*cell}" width="${cell}" height="${cell}" fill="black"/>`);
+      }
+    }
+  }
+  svg.push('</svg>');
+  return svg.join('');
+}
+
+// ─── Host create ─────────────────────────────────────────────────────────────
+function hostCreate() {
+  const name = document.getElementById('host-name').value.trim() || 'Player 1';
+  const difficulty = getHostDiff ? getHostDiff() : 1;
+  myDifficulty = difficulty;
+  socket.emit('create_game', { name, difficulty });
+}
+
+// ─── Client join ─────────────────────────────────────────────────────────────
+function clientJoin() {
+  const name = document.getElementById('client-name').value.trim() || 'Player 2';
+  const roomCode = document.getElementById('client-code').value.toUpperCase().trim();
+  const difficulty = getClientDiff ? getClientDiff() : 1;
+  const errEl = document.getElementById('join-error');
+  errEl.classList.add('hidden');
+
+  if (!roomCode || roomCode.length !== 4) {
+    errEl.textContent = 'Enter a 4-character room code.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  myDifficulty = difficulty;
+  socket.emit('join_game', { name, roomCode, difficulty });
+}
+
+// ─── Host start ──────────────────────────────────────────────────────────────
+function hostStart() {
+  socket.emit('start_game');
+}
+
+// ─── Socket events ───────────────────────────────────────────────────────────
+socket.on('room_created', ({ roomCode, playerId, serverUrl }) => {
+  myPlayerId = playerId;
+  document.getElementById('host-room-code').textContent = roomCode;
+
+  // Build join URL
+  const joinUrl = `${window.location.origin}?join=${roomCode}`;
+  document.getElementById('qr-code').innerHTML = buildQR(joinUrl);
+
+  showScreen('s-host-wait');
+});
+
+socket.on('room_joined', ({ playerId }) => {
+  myPlayerId = playerId;
+  showScreen('s-client-wait');
+});
+
+socket.on('join_error', ({ message }) => {
+  const errEl = document.getElementById('join-error');
+  errEl.textContent = message;
+  errEl.classList.remove('hidden');
+});
+
+socket.on('player_joined', ({ p2Name }) => {
+  document.getElementById('host-wait-status').textContent = `${p2Name} joined! Ready to start.`;
+  document.getElementById('host-start-btn').classList.remove('hidden');
+  toast(`${p2Name} joined the room!`, 'success');
+});
+
+socket.on('lobby_state', ({ roomCode, p1Name, p2Name, p1Diff, p2Diff }) => {
+  document.getElementById('client-wait-names').textContent =
+    `${p1Name} (Host) vs ${p2Name}`;
+});
+
+// Every visual event runs in order through this chain, so an animation is
+// never cut off by the next board redraw.
+let fxChain = Promise.resolve();
+function queueFx(fn, maxMs = 6000) {
+  fxChain = fxChain.then(() => Promise.race([Promise.resolve().then(fn), wait(maxMs)])).catch(e => console.error(e));
+  return fxChain;
+}
+
+socket.on('game_state', ({ state }) => {
+  queueFx(() => { gameState = state; renderGame(state); });
+});
+
+socket.on('action_result', (data) => {
+  queueFx(() => playFx(data));
+  const { type, message } = data;
+  toast(message, type);
+  // Update action log strip
+  const log = document.getElementById('action-log');
+  if (log) {
+    log.textContent = message;
+    log.className = `action-log ${type || ''}`;
+    // Dim back after 4s
+    clearTimeout(log._dimTimer);
+    log._dimTimer = setTimeout(() => {
+      log.className = 'action-log';
+    }, 4000);
+  }
+});
+
+socket.on('game_over', ({ winner }) => queueFx(() => showGameOver(winner)));
+
+async function showGameOver(winner) {
+  stopTimer();
+  await wait(300);
+  const isWinner = winner === myPlayerId;
+  const oppId = myPlayerId === 'p1' ? 'p2' : 'p1';
+  const winnerName = gameState?.players?.[winner]?.name || 'Player';
+  const oppName    = gameState?.players?.[oppId]?.name   || 'Opponent';
+
+  document.getElementById('gameover-title').textContent = isWinner ? '🏆 Victory!' : '💀 Defeat';
+  document.getElementById('gameover-sub').textContent = isWinner
+    ? `You defeated ${oppName}!`
+    : `${winnerName} wins — better luck next time!`;
+  const screen = document.getElementById('s-gameover');
+  const panel = screen.querySelector('.gameover-panel');
+  panel.classList.remove('win', 'lose');
+  screen.classList.remove('lose');
+  showScreen('s-gameover');
+  if (isWinner) {
+    panel.classList.add('win');
+    SFX.play('positive');
+    confetti();
+    setTimeout(confetti, 1600);
+  } else {
+    panel.classList.add('lose');
+    screen.classList.add('lose');
+    SFX.play('negative');
+  }
+}
+
+socket.on('opponent_disconnected', () => {
+  stopTimer();
+  showDisconnectOverlay('Opponent disconnected', 'They left the game. Return to the lobby to start a new game.');
+});
+
+socket.on('disconnect', () => {
+  // Only show overlay if we were mid-game (not on lobby screens)
+  const active = document.querySelector('.screen.active');
+  const lobbyIds = ['s-landing', 's-host-setup', 's-host-wait', 's-client-join', 's-client-wait'];
+  if (active && !lobbyIds.includes(active.id)) {
+    stopTimer();
+    showDisconnectOverlay('Connection lost', 'You were disconnected from the server.');
+  }
+});
+
+function showDisconnectOverlay(title, sub) {
+  // Remove any existing overlay
+  document.getElementById('disconnect-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'disconnect-overlay';
+  overlay.className = 'disconnect-overlay';
+  overlay.innerHTML = `
+    <div class="disconnect-title">⚡ ${title}</div>
+    <div class="disconnect-sub">${sub}</div>
+    <button class="btn btn-gold" style="max-width:220px;" onclick="location.reload()">Return to Lobby</button>
+  `;
+  document.body.appendChild(overlay);
+}
+
+socket.on('math_challenge', (challenge) => {
+  queueFx(() => { pendingChallenge = challenge; showMathChallenge(challenge); });
+});
+
+// ─── Wall flash tracking ─────────────────────────────────────────────────────
+// Keyed by containerId → array of { active, type } so we can detect changes
+const _prevWalls = {};
+
+// ─── Wall type → CSS class ───────────────────────────────────────────────────
+function wallColorClass(type) {
+  if (type === 'Wood') return 'bld';
+  if (type === 'Gem')  return 'wld';
+  return 'wall-stone'; // Stone
+}
+
+// ─── Game rendering ──────────────────────────────────────────────────────────
+function renderGame(state) {
+  if (!state || !myPlayerId) return;
+
+  const me = state.players[myPlayerId];
+  const oppId = myPlayerId === 'p1' ? 'p2' : 'p1';
+  const opp = state.players[oppId];
+  const isMyTurn = state.currentTurn === myPlayerId;
+
+  // HUD
+  const newTurn  = isMyTurn && (renderGame._prevTurn !== state.currentTurn);
+  const extraTurn = isMyTurn && !newTurn && renderGame._prevActions !== undefined
+                    && state.actionsLeft > renderGame._prevActions;
+  const spentNow = isMyTurn && !newTurn && !extraTurn && renderGame._prevActions !== undefined
+                    && state.actionsLeft < renderGame._prevActions;
+  document.getElementById('ap-dots').querySelectorAll('.ap-dot').forEach((dot, i) => {
+    dot.classList.toggle('spent', i >= state.actionsLeft);
+    dot.classList.remove('pop-in', 'pop-out');
+    void dot.offsetWidth; // restart CSS animation
+    if (newTurn || extraTurn) {
+      dot.style.animationDelay = `${0.35 + i * 0.12}s`;
+      dot.classList.add('pop-in');
+    } else if (spentNow && i >= state.actionsLeft && i < renderGame._prevActions) {
+      dot.style.animationDelay = '0s';
+      dot.classList.add('pop-out');
+    }
+  });
+  if (state.phase !== 'gameover') {
+    if (newTurn) showTurnBanner('YOUR TURN');
+    else if (extraTurn) showTurnBanner('EXTRA TURN!');
+  }
+  renderGame._prevTurn = state.currentTurn;
+  renderGame._prevActions = state.actionsLeft;
+  const turnBadge = document.getElementById('turn-badge');
+  turnBadge.textContent = isMyTurn ? 'Your Turn' : `${opp.name}'s Turn`;
+  turnBadge.className = `turn-badge${isMyTurn ? ' my-turn' : ''}`;
+  document.getElementById('round-label').textContent = `Round ${state.round}`;
+  document.getElementById('enemy-name-label').textContent = `${opp.name}'s Walls`;
+
+  // Walls & hand
+  renderWalls('enemy-walls', opp.walls, isMyTurn, 'enemy');
+  renderWalls('own-walls', me.walls, isMyTurn, 'own');
+  renderHand(me.hand, isMyTurn);
+
+  // Direct attack banner — show when all enemy walls gone and it's my turn
+  const enemyWipedOut = opp.walls.every(w => !w.active);
+  const banner = document.getElementById('direct-attack-banner');
+  banner.classList.toggle('hidden', !(isMyTurn && enemyWipedOut));
+
+  // Active buffs (Red Potion / Red Spell Book) — badges in the HUD + glowing cards
+  const eff = state.activeEffects?.[myPlayerId] || {};
+  const hud = document.querySelector('.game-hud');
+  let badges = document.getElementById('buff-badges');
+  if (!badges) {
+    badges = document.createElement('div');
+    badges.id = 'buff-badges';
+    badges.className = 'buff-badges';
+    hud.insertBefore(badges, document.getElementById('round-label'));
+  }
+  badges.innerHTML =
+    (eff.doublePower ? '<div class="buff-badge potion">🧪 Power Up</div>' : '') +
+    (eff.noMath ? '<div class="buff-badge book">📕 No Math</div>' : '');
+  document.getElementById('s-game').classList.toggle('buff-potion', !!eff.doublePower);
+  document.getElementById('s-game').classList.toggle('buff-book', !!eff.noMath);
+
+  // Don't navigate away if a math modal or shop is currently open —
+  // the modal will close itself when the player submits their answer.
+  const MODAL_IDS = ['s-math', 's-wild-draw', 's-wild-resolve', 's-shop'];
+  const activeEl = document.querySelector('.screen.active');
+  if (activeEl && MODAL_IDS.includes(activeEl.id)) return;
+
+  // Route screens
+  if (isMyTurn) {
+    showScreen('s-game');
+  } else {
+    document.getElementById('wait-enemy-name').textContent = opp.name;
+    renderWalls('wait-own-walls', me.walls, false, 'wait');
+    showScreen('s-waiting');
+  }
+}
+
+function renderWalls(containerId, walls, interactive, mode) {
+  const container = document.getElementById(containerId);
+  const sizeVar = (mode === 'wait' || mode === 'own') ? 'var(--own-w)' : 'var(--wall-w)';
+  const prev = _prevWalls[containerId] || [];
+
+  // Detect changes per slot for flash animations
+  const flashClass = walls.map((wall, idx) => {
+    const p = prev[idx];
+    if (!p) return null; // first render, no flash
+    if (p.active && !wall.active) return 'flash-destroy';  // wall destroyed
+    if (!p.active && wall.active) return 'flash-build';    // wall rebuilt
+    if (!p.active && !wall.active && p.type !== wall.type) return 'flash-build'; // type replaced
+    return null;
+  });
+
+  // Save new state
+  _prevWalls[containerId] = walls.map(w => ({ active: w.active, type: w.type }));
+
+  container.innerHTML = '';
+
+  walls.forEach((wall, idx) => {
+    const div = document.createElement('div');
+    div.className = `card art-card wall-card${wall.active ? '' : ' dead'}`;
+    div.style.width = sizeVar;
+    div.dataset.wallType = wall.type;
+    div.innerHTML = faceForWall(wall);
+
+    if (!wall.active) {
+      if (interactive && mode === 'own') {
+        // Dead own-wall slot = build target
+        div.style.cursor = 'pointer';
+        div.dataset.ownWallIndex = idx;
+        div.addEventListener('click', () => selectBuildTarget(idx));
+        setupDropOnOwnWall(div, idx);
+      }
+    } else {
+      if (interactive && mode === 'enemy') {
+        div.style.cursor = 'pointer';
+        div.dataset.wallIndex = idx;
+        div.addEventListener('click', () => selectAttackTarget(idx));
+        setupDropOnWall(div, idx, true);
+      }
+    }
+
+    // Apply flash class if this slot changed (unless we already animated it)
+    const key = `${containerId}:${idx}`;
+    if (suppressFlash.has(key)) {
+      suppressFlash.delete(key);
+    } else if (flashClass[idx]) {
+      const cls = flashClass[idx];
+      // Trigger on next frame so animation runs fresh
+      requestAnimationFrame(() => {
+        div.classList.add(cls);
+        const r = div.getBoundingClientRect();
+        if (!r.width) return; // container not on screen
+        const x = r.left + r.width / 2, y = r.top + r.height / 2;
+        if (cls === 'flash-destroy') {
+          SFX.play('wallBreak', 0.8);
+          shards(x, y, wall.type);
+          screenShake(6, 350);
+        } else {
+          setTimeout(() => burst(x, y + r.height * 0.35, {
+            count: 14, colors: ['#1e7a34', '#6effa0', '#c8f5d4'], dist: [30, 110], dur: 600, gravity: 20,
+          }), 300);
+        }
+      });
+    }
+
+    container.appendChild(div);
+  });
+}
+
+let _prevHandIds = new Set();
+function renderHand(hand, isMyTurn) {
+  const container = document.getElementById('hand-cards');
+  container.innerHTML = '';
+  let dealIdx = 0;
+  hand.forEach(card => {
+    const div = document.createElement('div');
+    const isAtk = card.type === 'attack';
+    const isSelected = (isAtk && selectedAttackCard?.id === card.id)
+                    || (!isAtk && selectedBuildCard?.id === card.id);
+    div.className = `card art-card ${isAtk ? 'atk' : 'bld'} hand-card`;
+    div.style.width = 'var(--hand-w)';
+    if (isSelected) {
+      div.style.outline = `3px solid ${isAtk ? 'var(--gold-hi)' : 'var(--green-hi)'}`;
+      div.style.transform = 'translateY(-8px) scale(1.06)';
+      div.style.zIndex = '2';
+    }
+    div.innerHTML = faceForCard(card);
+    if (giftIds.has(card.id)) {
+      div.classList.add('gift-in');
+      div.style.animationDelay = `${dealIdx++ * 0.15}s`;
+    } else if (!_prevHandIds.has(card.id)) {
+      div.classList.add('deal-in');
+      div.style.animationDelay = `${dealIdx++ * 0.08}s`;
+    }
+    if (isMyTurn) {
+      div.style.cursor = 'pointer';
+      div.addEventListener('click', () => isAtk ? handleAttackCard(card) : handleBuildCard(card));
+      div.addEventListener('pointerdown', () => { div.classList.add('lift'); SFX.play('select', 0.8); });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev =>
+        div.addEventListener(ev, () => div.classList.remove('lift')));
+      setupDragOnCard(div, card, true);
+    }
+    container.appendChild(div);
+  });
+  _prevHandIds = new Set(hand.map(c => c.id));
+  giftIds.clear();
+  // Set up the direct-attack banner as a drop target (re-wire each render)
+  setupDropOnDirectBanner();
+}
+
+// ─── Card interactions ───────────────────────────────────────────────────────
+let selectedAttackCard = null;
+let draggedCard = null; // for HTML5 drag-and-drop
+
+// ── Tap / click flow ──────────────────────────────────────────────────────────
+function handleAttackCard(card) {
+  // Deselect if tapping the same card again
+  if (selectedAttackCard?.id === card.id) {
+    selectedAttackCard = null;
+    clearWallHighlights();
+    if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
+    return;
+  }
+  selectedAttackCard = card;
+  if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
+  toast('Tap an enemy wall — or drag the card onto it', 'info');
+  highlightEnemyWalls();
+}
+
+function selectAttackTarget(wallIndex) {
+  if (!selectedAttackCard) {
+    toast('Select an attack card first', 'info');
+    return;
+  }
+  hitTarget(document.querySelector(`#enemy-walls [data-wall-index="${wallIndex}"]`));
+  socket.emit('play_attack', { cardId: selectedAttackCard.id, targetWallIndex: wallIndex });
+  selectedAttackCard = null;
+  clearWallHighlights();
+}
+
+function handleDirectAttack() {
+  if (!selectedAttackCard) {
+    toast('Select an attack card from your hand first!', 'info');
+    return;
+  }
+  hitTarget(document.querySelector('#direct-attack-banner button'));
+  socket.emit('play_attack', { cardId: selectedAttackCard.id, targetWallIndex: -1 });
+  selectedAttackCard = null;
+}
+
+let selectedBuildCard = null;
+
+function handleBuildCard(card) {
+  // Deselect if tapping same card again
+  if (selectedBuildCard?.id === card.id) {
+    selectedBuildCard = null;
+    clearOwnWallHighlights();
+    if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
+    return;
+  }
+  // Check there's actually an empty slot first
+  const me = gameState?.players[myPlayerId];
+  if (!me) return;
+  const hasEmptySlot = me.walls.some(w => !w.active);
+  if (!hasEmptySlot) {
+    toast('All wall slots are occupied!', 'info');
+    return;
+  }
+  selectedBuildCard = card;
+  if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
+  toast('Tap an empty wall slot — or drag the card onto it', 'info');
+  highlightOwnWallSlots();
+}
+
+function selectBuildTarget(slotIndex) {
+  if (!selectedBuildCard) {
+    toast('Select a build card first', 'info');
+    return;
+  }
+  hitTarget(document.querySelector(`#own-walls [data-own-wall-index="${slotIndex}"]`));
+  socket.emit('play_build', { cardId: selectedBuildCard.id, wallSlotIndex: slotIndex });
+  selectedBuildCard = null;
+  clearOwnWallHighlights();
+}
+
+// ── Highlight helpers ─────────────────────────────────────────────────────────
+function highlightEnemyWalls() {
+  document.querySelectorAll('#enemy-walls .wall-card:not(.dead)').forEach(w => {
+    w.style.boxShadow = '0 0 14px rgba(176,30,44,0.9)';
+    w.style.border    = '2px solid var(--red-hi)';
+  });
+}
+function clearWallHighlights() {
+  document.querySelectorAll('#enemy-walls .wall-card').forEach(w => {
+    w.style.boxShadow = '';
+    w.style.border    = '';
+    w.classList.remove('drag-over');
+  });
+}
+function highlightOwnWallSlots() {
+  document.querySelectorAll('#own-walls .wall-card.dead').forEach(w => {
+    w.style.boxShadow = '0 0 14px rgba(30,122,52,0.9)';
+    w.style.border    = '2px solid var(--green-hi)';
+  });
+}
+function clearOwnWallHighlights() {
+  document.querySelectorAll('#own-walls .wall-card').forEach(w => {
+    w.style.boxShadow = '';
+    w.style.border    = '';
+    w.classList.remove('drag-over-build');
+  });
+}
+
+// ── HTML5 Drag-and-Drop (desktop + iPad with pointer events) ──────────────────
+// Cards: draggable="true", dragstart stores card data
+// Walls: dragover / drop targets
+
+function setupDragOnCard(el, card, isMyTurn) {
+  if (!isMyTurn) return;
+  el.draggable = true;
+
+  el.addEventListener('dragstart', e => {
+    draggedCard = card;
+    if (card.type === 'attack') selectedAttackCard = card;
+    if (card.type === 'build')  selectedBuildCard  = card;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.id);
+    setTimeout(() => el.classList.add('dragging'), 0);
+  });
+
+  el.addEventListener('dragend', () => {
+    draggedCard = null;
+    el.classList.remove('dragging');
+    clearWallHighlights();
+    if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
+  });
+
+  // Touch-based drag fallback (iOS Safari)
+  setupTouchDrag(el, card);
+}
+
+function setupDropOnWall(el, wallIndex, isAlive) {
+  if (!isAlive) return;
+
+  el.addEventListener('dragover', e => {
+    if (!draggedCard || draggedCard.type !== 'attack') return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    el.classList.add('drag-over');
+  });
+
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    el.classList.remove('drag-over');
+    if (!draggedCard || draggedCard.type !== 'attack') return;
+    hitTarget(el);
+    socket.emit('play_attack', { cardId: draggedCard.id, targetWallIndex: wallIndex });
+    draggedCard = null;
+    selectedAttackCard = null;
+    clearWallHighlights();
+  });
+}
+
+function setupDropOnOwnWall(el, slotIndex) {
+  el.addEventListener('dragover', e => {
+    if (!draggedCard || draggedCard.type !== 'build') return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    el.classList.add('drag-over-build');
+  });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over-build'));
+  el.addEventListener('drop', e => {
+    e.preventDefault();
+    el.classList.remove('drag-over-build');
+    if (!draggedCard || draggedCard.type !== 'build') return;
+    hitTarget(el);
+    socket.emit('play_build', { cardId: draggedCard.id, wallSlotIndex: slotIndex });
+    draggedCard = null;
+    selectedBuildCard = null;
+    clearOwnWallHighlights();
+  });
+}
+
+function setupDropOnDirectBanner() {
+  const banner = document.getElementById('direct-attack-banner');
+  if (!banner || banner._dropWired) return;
+  banner._dropWired = true;
+
+  banner.addEventListener('dragover', e => {
+    if (!draggedCard || draggedCard.type !== 'attack') return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    banner.style.outline = '2px solid var(--red-hi)';
+  });
+
+  banner.addEventListener('dragleave', () => banner.style.outline = '');
+
+  banner.addEventListener('drop', e => {
+    e.preventDefault();
+    banner.style.outline = '';
+    if (!draggedCard || draggedCard.type !== 'attack') return;
+    hitTarget(banner.querySelector('button'));
+    socket.emit('play_attack', { cardId: draggedCard.id, targetWallIndex: -1 });
+    draggedCard = null;
+    selectedAttackCard = null;
+  });
+}
+
+// ── iOS / touch drag ──────────────────────────────────────────────────────────
+// Works for attack AND build cards. A plain tap (no movement) falls through to
+// the click handler; a drag shows a tilting ghost that springs back on a miss.
+function setupTouchDrag(el, card) {
+  let ghost = null, dragging = false;
+  let startX = 0, startY = 0, lastX = 0, tilt = 0, origRect = null;
+  const isAtk = card.type === 'attack';
+
+  const clearHover = () => {
+    document.querySelectorAll('.drag-over, .drag-over-build')
+      .forEach(x => x.classList.remove('drag-over', 'drag-over-build'));
+    const b = document.getElementById('direct-attack-banner');
+    if (b) b.style.outline = '';
+  };
+  const finish = () => {
+    dragging = false;
+    draggedCard = null;
+    clearHover();
+    clearWallHighlights();
+    clearOwnWallHighlights();
+  };
+  const springBack = () => {
+    const g = ghost; ghost = null;
+    if (!g) return;
+    const curL = parseFloat(g.style.left), curT = parseFloat(g.style.top);
+    anim(g, [
+      { transform: `translate(0,0) scale(1.12) rotate(${tilt}deg)` },
+      { transform: `translate(${origRect.left - curL}px, ${origRect.top - curT}px) scale(1) rotate(0deg)` },
+    ], { duration: 380, easing: 'cubic-bezier(.3,1.4,.5,1)', fill: 'forwards' })
+      .then(() => { g.remove(); el.style.opacity = ''; });
+  };
+  const slamInto = (targetEl) => {
+    const g = ghost; ghost = null;
+    if (!g) return;
+    const t = centerOf(targetEl);
+    const curL = parseFloat(g.style.left) + origRect.width / 2;
+    const curT = parseFloat(g.style.top) + origRect.height / 2;
+    anim(g, [
+      { transform: `translate(0,0) scale(1.12) rotate(${tilt}deg)`, opacity: 1 },
+      { transform: `translate(${t.x - curL}px, ${t.y - curT}px) scale(0.35) rotate(0deg)`, opacity: 0 },
+    ], { duration: 200, easing: 'ease-in', fill: 'forwards' }).then(() => g.remove());
+  };
+
+  el.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    startX = lastX = t.clientX; startY = t.clientY;
+    tilt = 0;
+    origRect = el.getBoundingClientRect();
+    dragging = false;
+  }, { passive: true });
+
+  el.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    if (!dragging) {
+      if (Math.hypot(t.clientX - startX, t.clientY - startY) < 8) return;
+      dragging = true;
+      draggedCard = card;
+      if (isAtk) { selectedAttackCard = card; highlightEnemyWalls(); }
+      else       { selectedBuildCard  = card; highlightOwnWallSlots(); }
+      ghost = el.cloneNode(true);
+      ghost.classList.remove('lift', 'deal-in');
+      ghost.classList.add('drag-ghost');
+      ghost.style.width = origRect.width + 'px';
+      ghost.style.outline = '';
+      ghost.style.left = origRect.left + 'px';
+      ghost.style.top = origRect.top + 'px';
+      document.body.appendChild(ghost);
+      el.style.opacity = '0.3';
+    }
+    e.preventDefault();
+    const vx = t.clientX - lastX; lastX = t.clientX;
+    tilt = tilt * 0.75 + Math.max(-22, Math.min(22, vx * 2.2)) * 0.25;
+    ghost.style.left = (t.clientX - origRect.width / 2) + 'px';
+    ghost.style.top  = (t.clientY - origRect.height / 2) + 'px';
+    ghost.style.transform = REDUCED_MOTION ? 'scale(1.08)' : `scale(1.12) rotate(${tilt}deg)`;
+
+    clearHover();
+    const underEl = document.elementFromPoint(t.clientX, t.clientY);
+    if (isAtk) {
+      underEl?.closest('[data-wall-index]')?.classList.add('drag-over');
+      const bannerEl = underEl?.closest('#direct-attack-banner');
+      if (bannerEl) bannerEl.style.outline = '2px solid var(--red-hi)';
+    } else {
+      underEl?.closest('[data-own-wall-index]')?.classList.add('drag-over-build');
+    }
+  }, { passive: false });
+
+  el.addEventListener('touchend', e => {
+    if (!dragging) return; // plain tap → click handler does the work
+    e.preventDefault();    // stop the synthetic click after a drag
+    const t = e.changedTouches[0];
+    const underEl = document.elementFromPoint(t.clientX, t.clientY);
+
+    if (isAtk) {
+      const wallEl = underEl?.closest('[data-wall-index]');
+      if (wallEl) {
+        hitTarget(wallEl); slamInto(wallEl);
+        socket.emit('play_attack', { cardId: card.id, targetWallIndex: parseInt(wallEl.dataset.wallIndex, 10) });
+        selectedAttackCard = null; finish(); return;
+      }
+      const bannerEl = underEl?.closest('#direct-attack-banner');
+      if (bannerEl && !bannerEl.classList.contains('hidden')) {
+        hitTarget(bannerEl.querySelector('button')); slamInto(bannerEl);
+        socket.emit('play_attack', { cardId: card.id, targetWallIndex: -1 });
+        selectedAttackCard = null; finish(); return;
+      }
+    } else {
+      const slotEl = underEl?.closest('[data-own-wall-index]');
+      if (slotEl) {
+        hitTarget(slotEl); slamInto(slotEl);
+        socket.emit('play_build', { cardId: card.id, wallSlotIndex: parseInt(slotEl.dataset.ownWallIndex, 10) });
+        selectedBuildCard = null; finish(); return;
+      }
+    }
+    // Missed — spring back to the hand
+    selectedAttackCard = null; selectedBuildCard = null;
+    finish();
+    springBack();
+  }, { passive: false });
+
+  el.addEventListener('touchcancel', () => {
+    if (!dragging) return;
+    selectedAttackCard = null; selectedBuildCard = null;
+    finish();
+    springBack();
+  });
+}
+
+// ─── Shop ────────────────────────────────────────────────────────────────────
+const PILE_DEFS = [
+  { key: 'attack', icon: '⚔️', label: 'Attack', color: 'atk', desc: 'Sword · Gun · Hammer' },
+  { key: 'build',  icon: '🏰', label: 'Build',  color: 'bld', desc: 'Stone · Wood · Gem' },
+  { key: 'wild',   icon: '✨', label: 'Wild',   color: 'wld', desc: 'Potions · Chests' },
+];
+
+function openShop() {
+  if (!gameState || gameState.currentTurn !== myPlayerId) {
+    toast("It's not your turn!", 'error');
+    return;
+  }
+  const container = document.getElementById('shop-piles');
+  container.innerHTML = '';
+  PILE_DEFS.forEach(p => {
+    const div = document.createElement('div');
+    div.className = `card art-card ${p.color} pile-card`;
+    div.innerHTML = cardFace('back', { tone: p.color, name: p.label });
+    div.addEventListener('click', () => {
+      SFX.play('select');
+      socket.emit('shop_pick', { pileType: p.key });
+      closeShop();
+    });
+    container.appendChild(div);
+  });
+  showScreen('s-shop');
+}
+
+function closeShop() {
+  if (gameState && gameState.currentTurn === myPlayerId) showScreen('s-game');
+  else showScreen('s-waiting');
+}
+
+// ─── End turn ────────────────────────────────────────────────────────────────
+function sendEndTurn() {
+  if (gameState && gameState.actionsLeft > 0) {
+    // First tap: warn. Second tap within 2s: confirm.
+    if (!sendEndTurn._warned) {
+      sendEndTurn._warned = true;
+      toast(`You still have ${gameState.actionsLeft} action${gameState.actionsLeft > 1 ? 's' : ''} left — tap Pass again to confirm.`, 'info');
+      setTimeout(() => { sendEndTurn._warned = false; }, 2000);
+      return;
+    }
+  }
+  sendEndTurn._warned = false;
+  socket.emit('end_turn');
+}
+
+// ─── Math challenge modal ────────────────────────────────────────────────────
+function showMathChallenge(challenge) {
+  const { card, action } = challenge;
+
+  if (action === 'wild_draw') {
+    // Wild is still face-down while you solve to take it
+    document.getElementById('wild-draw-card').innerHTML = cardFace('back', { tone: 'wld', eq: card.drawEq, name: 'Wild' });
+    startTimer('wild-draw-timer-bar', 'wild-draw-timer-wrap');
+    showScreen('s-wild-draw');
+    introMathCard(document.getElementById('s-wild-draw'), 'flip');
+    document.getElementById('wild-draw-answer').value = '';
+    document.getElementById('wild-draw-answer').focus();
+    return;
+  }
+
+  if (action === 'wild_resolve') {
+    document.getElementById('wild-resolve-card').innerHTML = cardFace('wld', {
+      art: IMG[card.effect], eq: card.resolveEq, name: card.name, hint: challenge.context?.effectDesc || '',
+    });
+    startTimer('wild-resolve-timer-bar', 'wild-resolve-timer-wrap');
+    showScreen('s-wild-resolve');
+    introMathCard(document.getElementById('s-wild-resolve'), 'flip');
+    document.getElementById('wild-resolve-answer').value = '';
+    document.getElementById('wild-resolve-answer').focus();
+    return;
+  }
+
+  // Attack, build, shop draw
+  const mathCard = document.getElementById('math-card');
+  mathCard.className = `math-big-card art-card ${card.type === 'attack' ? 'atk' : card.type === 'build' ? 'bld' : 'wld'}`;
+  mathCard.innerHTML = faceForCard(card);
+
+  startTimer('timer-bar', 'timer-wrap');
+  showScreen('s-math');
+  introMathCard(document.getElementById('s-math'), (action === 'attack' || action === 'build') ? 'zoom' : 'flip');
+  document.getElementById('math-answer').value = '';
+  document.getElementById('math-answer').focus();
+}
+
+function startTimer(barId, wrapId) {
+  stopTimer();
+  const bar = document.getElementById(barId);
+  const wrap = document.getElementById(wrapId);
+
+  if (myDifficulty === 1) {
+    wrap.style.display = 'none';
+    return;
+  }
+  wrap.style.display = '';
+  timerSeconds = myDifficulty === 2 ? 20 : 10;
+
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  bar.classList.remove('danger');
+
+  let remaining = timerSeconds;
+  bar.style.transition = `width 1s linear`;
+
+  timerInterval = setInterval(() => {
+    remaining--;
+    const pct = Math.max(0, (remaining / timerSeconds) * 100);
+    bar.style.width = pct + '%';
+    if (pct < 30) bar.classList.add('danger');
+    if (remaining > 0 && remaining <= 3) {
+      document.querySelector('.screen.active .math-big-card')?.classList.add('urgent');
+    }
+    if (remaining <= 0) {
+      stopTimer();
+      sendAnswer(-9999); // time's up → counts as wrong
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  document.querySelectorAll('.math-big-card.urgent').forEach(c => c.classList.remove('urgent'));
+}
+
+function closeModal() {
+  stopTimer();
+  pendingChallenge = null;
+  if (gameState && gameState.currentTurn === myPlayerId) showScreen('s-game');
+  else showScreen('s-waiting');
+}
+
+// Send the answer and keep the card on screen until the server's verdict
+// arrives (action_result → fxAnswerResult plays correct/wrong, then closes).
+function sendAnswer(answer) {
+  const ch = pendingChallenge;
+  if (!ch) return;
+  stopTimer();
+  pendingChallenge = null;
+
+  if (ch.action === 'attack') {
+    socket.emit('solve_attack', { cardId: ch.card.id, targetWallIndex: ch.context?.wallIndex, answer });
+  } else if (ch.action === 'build') {
+    socket.emit('solve_build', { cardId: ch.card.id, wallSlotIndex: ch.context?.slotIndex, answer });
+  } else if (ch.action === 'wild_resolve') {
+    socket.emit('solve_wild_resolve', { cardId: ch.card.id, answer });
+  } else {
+    socket.emit('solve_draw', { cardId: ch.card.id, answer }); // shop_draw + wild_draw
+  }
+  beginAwait(document.querySelector('.screen.active'));
+}
+
+function submitFrom(inputId) {
+  const raw = document.getElementById(inputId).value.trim();
+  if (raw === '') { shakeMathInput(inputId); return; }
+  sendAnswer(Number(raw));
+}
+function submitMath()        { submitFrom('math-answer'); }
+function submitWildDraw()    { submitFrom('wild-draw-answer'); }
+function submitWildResolve() { submitFrom('wild-resolve-answer'); }
+
+// Shake animation on empty-answer submit attempt
+function shakeMathInput(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.animation = 'none';
+  el.offsetHeight; // reflow
+  el.style.animation = 'shake 0.35s ease';
+  el.focus();
+  setTimeout(() => el.style.animation = '', 400);
+}
+
+// ─── Enter key support ───────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const active = document.querySelector('.screen.active');
+    if (!active) return;
+    if (active.id === 's-math') submitMath();
+    if (active.id === 's-wild-draw') submitWildDraw();
+    if (active.id === 's-wild-resolve') submitWildResolve();
+  }
+});
+
+// ─── Auto-fill room code from URL (?join=XXXX) ───────────────────────────────
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const joinCode = params.get('join');
+  if (joinCode) {
+    document.getElementById('client-code').value = joinCode.toUpperCase();
+    showScreen('s-client-join');
+  }
+})();
+</script>
+</body>
+</html>
