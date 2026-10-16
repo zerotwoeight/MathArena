@@ -2,7 +2,7 @@
 
 const {
   buildAttackPile, buildBuildPile, buildWildPile,
-  drawStartingHand, buildStartingWalls, MATCHUP, WILD_DEFS,
+  drawStartingHand, buildStartingWalls, MATCHUP, WILD_DEFS, makeEq,
 } = require('./cardData');
 const WILD_EFFECTS = require('./wildEffects');
 
@@ -53,6 +53,10 @@ class GameState {
       },
     };
 
+    // Each player gets problems at their own star level
+    this.players.p1.hand.forEach(c => this.fitCard(c, 'p1'));
+    this.players.p2.hand.forEach(c => this.fitCard(c, 'p2'));
+
     // Pending action context (for two-step interactions)
     this._pending = null;
   }
@@ -98,6 +102,17 @@ class GameState {
     return hand.splice(idx, 1)[0];
   }
 
+  // Re-rolls an attack/build card's problem to match this player's difficulty.
+  // Called whenever a card is about to be shown to, or land in, a player's hand.
+  fitCard(card, playerId) {
+    if (card && (card.type === 'attack' || card.type === 'build')) {
+      const { eq, answer } = makeEq(this.difficulty[playerId] || 1);
+      card.eq = eq;
+      card.answer = answer;
+    }
+    return card;
+  }
+
   handSpace(playerId) {
     return MAX_HAND - this.players[playerId].hand.length;
   }
@@ -122,7 +137,7 @@ class GameState {
   // Free card from a chest/armory. Only takes a card if it fits — nothing is lost.
   giveFreeCard(playerId, pileType) {
     if (this.handSpace(playerId) <= 0) return null;
-    const card = this.drawFromPile(pileType);
+    const card = this.fitCard(this.drawFromPile(pileType), playerId);
     this.addToHand(playerId, card);
     return card;
   }
@@ -191,7 +206,7 @@ class GameState {
     // Red Spell Book: the whole shop action skips the math.
     if (this.activeEffects[playerId].noMath) {
       this.activeEffects[playerId].noMath = false;
-      const card = this.drawFromPile(pileType);
+      const card = this.fitCard(this.drawFromPile(pileType), playerId);
       if (pileType === 'wild') return this._applyWild(playerId, card, true, '📕 ');
       this.addToHand(playerId, card);
       this._useAction();
@@ -203,7 +218,7 @@ class GameState {
       };
     }
 
-    const card = this.peekPile(pileType);
+    const card = this.fitCard(this.peekPile(pileType), playerId);
     const action = pileType === 'wild' ? 'wild_draw' : 'shop_draw';
     this._pending = { playerId, action, pileType, card };
     return { mathChallenge: { card, action, context: {} } };
@@ -321,7 +336,7 @@ class GameState {
 
     // Attempted wall attack but no walls left
     if (targetWallIndex !== -1 && !anyWall) {
-      return { type: 'info', message: 'All walls are gone — use Direct Attack!' };
+      return { type: 'info', message: 'All walls are gone. Use Direct Attack!' };
     }
 
     const noMath = this.activeEffects[playerId].noMath;
@@ -359,7 +374,7 @@ class GameState {
       return {
         type: 'error',
         message: potionLost
-          ? `✗ Wrong! Attack failed — and your 🧪 Red Potion is gone! The answer was ${card?.answer}.`
+          ? `✗ Wrong! Attack failed, and your 🧪 Red Potion is gone! The answer was ${card?.answer}.`
           : `✗ Wrong! Attack failed. The answer was ${card?.answer}.`,
         stateUpdated: true,
         fx: { kind: 'wrong', answer: card?.answer, potionLost },

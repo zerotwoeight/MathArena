@@ -1037,3 +1037,60 @@ html, body {
 /* Shop: make room for three full-size card backs */
 .shop-panel { width: min(96vw, 680px); }
 .shop-piles .pile-card { width: min(var(--pile-w), calc((min(96vw, 680px) - 110px) / 3)); }
+
+/* Join address shown under the QR code */
+.join-url {
+  font-family: 'Exo 2', sans-serif; font-weight: 700;
+  font-size: var(--fs-sm); color: var(--gold-hi);
+  background: var(--surface2); border: 1px solid var(--rim-hi); border-radius: 8px;
+  padding: 6px 12px; text-align: center; word-break: break-all;
+  user-select: text; -webkit-user-select: text;
+}
+
+/* ═══ How to Play ═════════════════════════════════════════════════════════ */
+.htp-link {
+  background: none; border: none; cursor: pointer;
+  font-family: 'Cinzel', serif; font-size: var(--fs-sm); color: var(--gold);
+  text-decoration: underline; text-underline-offset: 4px; padding: 6px;
+}
+.howto {
+  position: fixed; inset: 0; z-index: 9997;
+  background: rgba(4,5,8,0.88);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.howto.hidden { display: none; }
+.howto-card {
+  position: relative;
+  width: min(92vw, 440px);
+  background: var(--surface);
+  border: 2px solid var(--gold);
+  border-radius: 18px;
+  padding: clamp(18px, 5vw, 28px);
+  display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 3vw, 16px);
+  box-shadow: 0 0 40px rgba(200,164,40,0.25);
+  text-align: center;
+}
+.htp-skip {
+  position: absolute; top: 10px; right: 14px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: var(--fs-xs); font-family: 'Exo 2', sans-serif;
+}
+.htp-art {
+  width: clamp(120px, 38vw, 180px); aspect-ratio: 1;
+  background: center / contain no-repeat;
+  filter: drop-shadow(0 6px 10px rgba(0,0,0,0.6));
+}
+.htp-art.cover { background-size: cover; border-radius: 12px; border: 2px solid var(--rim-hi); aspect-ratio: 2 / 3; width: clamp(90px, 26vw, 130px); }
+.htp-title { font-family: 'Cinzel', serif; font-size: var(--fs-lg); color: var(--gold-hi); line-height: 1.2; }
+.htp-body  { font-size: var(--fs-md); line-height: 1.5; color: var(--text); }
+.htp-dots { display: flex; gap: 8px; }
+.htp-dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--rim-hi); transition: background 0.2s, transform 0.2s; }
+.htp-dots span.on { background: var(--gold-hi); transform: scale(1.25); }
+
+/* Version tag on the title screen */
+.version-tag {
+  font-family: 'Exo 2', sans-serif; font-size: var(--fs-xs);
+  color: var(--text-dim); opacity: 0.7; letter-spacing: 0.05em;
+  user-select: text; -webkit-user-select: text;
+}
+.version-tag.mismatch { color: #ff8899; opacity: 1; }

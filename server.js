@@ -9,8 +9,19 @@ const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Version: bump "version" in package.json AND CLIENT_VERSION in public/index.html together.
+const SERVER_VERSION = require('./package.json').version;
+const STARTED_AT = new Date().toISOString();
+
+// Version check: open /version in a browser to see what the server is running
+app.get('/version', (req, res) => res.json({ version: SERVER_VERSION, started: STARTED_AT }));
+
+// Serve static files. HTML is never cached, so iPads always get the newest page.
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+  },
+}));
 
 // ─── Room state ───────────────────────────────────────────────────────────────
 // rooms Map: roomCode → { p1: socketId, p2: socketId|null, p1Name, p2Name, p1Diff, p2Diff, state }
@@ -28,6 +39,7 @@ function generateRoomCode() {
 // ─── Socket.io events ─────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`[connect] ${socket.id}`);
+  socket.emit('server_version', { version: SERVER_VERSION });
 
   // ── create_game ─────────────────────────────────────────────────────────────
   socket.on('create_game', ({ name, difficulty }) => {
@@ -249,5 +261,5 @@ function handleActionResult(socket, room, result) {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 server.listen(PORT, () => {
-  console.log(`⚔  Math Card Game running on http://localhost:${PORT}`);
+  console.log(`⚔  Math Card Game v${SERVER_VERSION} running on http://localhost:${PORT}`);
 });

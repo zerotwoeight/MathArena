@@ -41,18 +41,18 @@ const EFFECTS = {
     const card = gs.giveFreeCard(playerId, pile);
     return card
       ? { message: `🗃️ Iron Chest! +1 action + free ${card.sub} ${card.icon}!`, fx: { gained: [card.id], extraAction: true } }
-      : { message: '🗃️ Iron Chest! +1 action! (Hand full — no free card.)', fx: { handFull: true, extraAction: true } };
+      : { message: '🗃️ Iron Chest! +1 action! (Hand full, so no free card.)', fx: { handFull: true, extraAction: true } };
   },
 
   purple_potion(gs, playerId, _card, resolveCorrect) {
     if (!resolveCorrect) {
       const lost = gs.removeRandomWall(playerId);
       return {
-        message: lost >= 0 ? '🟣 Purple Potion! Wrong answer — you lost a wall!' : '🟣 Purple Potion! Wrong answer — but you had no walls left.',
+        message: lost >= 0 ? '🟣 Purple Potion! Wrong answer, you lost a wall!' : '🟣 Purple Potion! Wrong answer, but you had no walls left.',
         fx: { lostWalls: lost >= 0 ? [lost] : [] },
       };
     }
-    return { message: '🟣 Purple Potion! Correct — your walls are safe.', fx: { safe: true } };
+    return { message: '🟣 Purple Potion! Correct! Your walls are safe.', fx: { safe: true } };
   },
 
   gold_chest(gs, playerId) {
@@ -86,7 +86,7 @@ const EFFECTS = {
     if (!resolveCorrect) {
       const b = gs.removeRandomWall(playerId);
       if (b >= 0) lost.push(b);
-      return { message: `☠️ Poison Drink! Wrong answer — lost ${lost.length} wall${lost.length === 1 ? '' : 's'}!`, fx: { lostWalls: lost } };
+      return { message: `☠️ Poison Drink! Wrong answer, you lost ${lost.length} wall${lost.length === 1 ? '' : 's'}!`, fx: { lostWalls: lost } };
     }
     return { message: lost.length ? '☠️ Poison Drink! Lost 1 wall (unavoidable).' : '☠️ Poison Drink! …no walls left to lose.', fx: { lostWalls: lost } };
   },
@@ -107,7 +107,7 @@ const EFFECTS = {
     const gained = [];
     for (let i = 0; i < n; i++) {
       const idx = Math.floor(Math.random() * opp.hand.length);
-      const card = opp.hand.splice(idx, 1)[0];
+      const card = gs.fitCard(opp.hand.splice(idx, 1)[0], playerId);
       gs.addToHand(playerId, card);
       gained.push(card.id);
     }

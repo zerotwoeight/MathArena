@@ -63,7 +63,7 @@ const WILD_DEFS = [
   { effect: 'iron_chest',  name: 'Iron Chest',    icon: '🗃️', desc: 'Extra action + 1 free card added to hand.' },
   { effect: 'purple_potion',name: 'Purple Potion',icon: '🟣', desc: 'Lose 1 random wall if wrong; safe if correct.' },
   { effect: 'gold_chest',  name: 'Gold Chest',    icon: '🏆', desc: 'Free attack card + free build card added to hand.' },
-  { effect: 'red_spellbook',name: 'Red Spell Book',icon: '📕',desc: 'No math for 1 full turn — all card plays auto-resolve.' },
+  { effect: 'red_spellbook',name: 'Red Spell Book',icon: '📕',desc: 'Your next action needs no math!' },
   { effect: 'poison_drink',name: 'Poison Drink',  icon: '☠️', desc: 'Lose 1 random wall; wrong solve = lose 2 walls.' },
   { effect: 'armory',      name: 'Armory',        icon: '🛡️', desc: 'Free build card added to hand.' },
   { effect: 'looking_glass',name: 'Looking Glass',icon: '🔮', desc: 'Steal 2 random cards from opponent\'s hand.' },
@@ -135,4 +135,5 @@ module.exports = {
   buildStartingWalls,
   MATCHUP,
   WILD_DEFS,
+  makeEq,
 };

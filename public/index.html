@@ -21,7 +21,21 @@
     <div class="lobby-panel">
       <button class="btn btn-gold" onclick="showScreen('s-host-setup')">Create Game</button>
       <button class="btn btn-outline" onclick="showScreen('s-client-join')">Join Game</button>
+      <button class="htp-link" onclick="openHowTo()">📖 How to Play</button>
     </div>
+    <div class="version-tag" id="version-tag"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ HOW TO PLAY -->
+<div id="howto" class="howto hidden" role="dialog" aria-modal="true" aria-labelledby="htp-title">
+  <div class="howto-card">
+    <button class="htp-skip" onclick="closeHowTo()">Skip</button>
+    <div class="htp-art" id="htp-art"></div>
+    <h2 class="htp-title" id="htp-title"></h2>
+    <p class="htp-body" id="htp-body"></p>
+    <div class="htp-dots" id="htp-dots"><span></span><span></span><span></span></div>
+    <button class="btn btn-gold w-full" id="htp-next" onclick="howToNext()">Next →</button>
   </div>
 </div>
 
@@ -38,7 +52,7 @@
           <div class="diff-star"    data-v="2">⭐</div>
           <div class="diff-star"    data-v="3">⭐</div>
         </div>
-        <div class="diff-level" id="host-diff-label">Easy — No timer</div>
+        <div class="diff-level" id="host-diff-label">Easy: No timer</div>
       </div>
       <button class="btn btn-gold" onclick="hostCreate()">Create Room</button>
       <button class="btn btn-ghost" onclick="showScreen('s-landing')">← Back</button>
@@ -59,7 +73,8 @@
         <div id="qr-code" style="width:clamp(110px,34vw,170px);height:clamp(110px,34vw,170px);background:#fff;border-radius:8px;padding:8px;display:flex;align-items:center;justify-content:center;">
           <!-- QR SVG injected by JS -->
         </div>
-        <div class="text-dim" style="font-size:var(--fs-xs);">Scan to join</div>
+        <div class="text-dim" style="font-size:var(--fs-xs);">Scan to join, or type this into the other iPad:</div>
+        <div id="join-url" class="join-url"></div>
       </div>
 
       <div id="host-wait-status" class="text-dim" style="font-size:var(--fs-sm);text-align:center;">Waiting for opponent to join…</div>
@@ -86,7 +101,7 @@
           <div class="diff-star"    data-v="2">⭐</div>
           <div class="diff-star"    data-v="3">⭐</div>
         </div>
-        <div class="diff-level" id="client-diff-label">Easy — No timer</div>
+        <div class="diff-level" id="client-diff-label">Easy: No timer</div>
       </div>
       <div id="join-error" class="hidden" style="color:#ff8899;font-size:var(--fs-xs);text-align:center;"></div>
       <button class="btn btn-gold" onclick="clientJoin()">Join Room</button>
@@ -128,7 +143,7 @@
       <div style="font-size:var(--fs-xs);color:var(--text-dim);font-family:'Cinzel',serif;" id="round-label">Round 1</div>
     </div>
     <!-- Action log strip -->
-    <div class="action-log" id="action-log">—</div>
+    <div class="action-log" id="action-log">&nbsp;</div>
 
     <!-- Enemy zone -->
     <div class="enemy-zone">
@@ -257,6 +272,8 @@
 <script src="/socket.io/socket.io.js"></script>
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
+// Version: bump this AND "version" in package.json together.
+const CLIENT_VERSION = '1.2.0';
 const socket = io();
 let myPlayerId = null;
 let myDifficulty = 1;
@@ -745,6 +762,8 @@ async function fxWild(fx, mine, actor) {
         { filter: 'brightness(1.6) hue-rotate(20deg)', boxShadow: '0 0 26px rgba(120,160,255,1)', offset: 0.4 },
         { filter: 'brightness(1)', boxShadow: '0 0 0 rgba(120,160,255,0)' },
       ], { duration: 900, delay: i * 120 }));
+  } else if (fx.effect === 'iron_chest') {
+    showTurnBanner('+1 ACTION!', true);
   } else if (fx.effect === 'red_potion') {
     SFX.play('positive', 0.6);
   } else if (fx.effect === 'red_spellbook') {
@@ -875,7 +894,7 @@ function toast(message, type = 'info') {
 }
 
 // ─── Difficulty stars ────────────────────────────────────────────────────────
-const DIFF_LABELS = ['', 'Easy — No timer', 'Medium — 20s', 'Hard — 10s'];
+const DIFF_LABELS = ['', 'Easy: No timer', 'Medium: 10 seconds', 'Hard: 5 seconds'];
 
 function initDiffStars(wrapId, labelId, onChange) {
   const wrap = document.getElementById(wrapId);
@@ -1150,6 +1169,20 @@ function hostStart() {
 }
 
 // ─── Socket events ───────────────────────────────────────────────────────────
+// ─── Version check (shown small on the title screen) ─────────────────────────
+function showVersion(serverVersion) {
+  const el = document.getElementById('version-tag');
+  if (!el) return;
+  if (!serverVersion) { el.textContent = `Page v${CLIENT_VERSION} · Server: connecting…`; el.className = 'version-tag'; return; }
+  const match = serverVersion === CLIENT_VERSION;
+  el.textContent = match
+    ? `v${CLIENT_VERSION}`
+    : `Page v${CLIENT_VERSION} · Server v${serverVersion} (mismatch, refresh the page)`;
+  el.className = 'version-tag' + (match ? '' : ' mismatch');
+}
+showVersion(null);
+socket.on('server_version', ({ version }) => showVersion(version));
+
 socket.on('room_created', ({ roomCode, playerId, serverUrl }) => {
   myPlayerId = playerId;
   document.getElementById('host-room-code').textContent = roomCode;
@@ -1158,6 +1191,7 @@ socket.on('room_created', ({ roomCode, playerId, serverUrl }) => {
   const joinUrl = `${window.location.origin}?join=${roomCode}`;
   try {
     document.getElementById('qr-code').innerHTML = QR.svg(joinUrl);
+    document.getElementById('join-url').textContent = window.location.host;
   } catch (e) {
     document.getElementById('qr-code').textContent = joinUrl; // fallback: show the link
   }
@@ -1229,7 +1263,7 @@ async function showGameOver(winner) {
   document.getElementById('gameover-title').textContent = isWinner ? '🏆 Victory!' : '💀 Defeat';
   document.getElementById('gameover-sub').textContent = isWinner
     ? `You defeated ${oppName}!`
-    : `${winnerName} wins — better luck next time!`;
+    : `${winnerName} wins! Better luck next time!`;
   const screen = document.getElementById('s-gameover');
   const panel = screen.querySelector('.gameover-panel');
   panel.classList.remove('win', 'lose');
@@ -1500,7 +1534,7 @@ function handleAttackCard(card) {
   }
   selectedAttackCard = card;
   if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
-  toast('Tap an enemy wall — or drag the card onto it', 'info');
+  toast('Tap an enemy wall, or drag the card onto it', 'info');
   highlightEnemyWalls();
 }
 
@@ -1545,7 +1579,7 @@ function handleBuildCard(card) {
   }
   selectedBuildCard = card;
   if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
-  toast('Tap an empty wall slot — or drag the card onto it', 'info');
+  toast('Tap an empty wall slot, or drag the card onto it', 'info');
   highlightOwnWallSlots();
 }
 
@@ -1852,7 +1886,7 @@ function sendEndTurn() {
     // First tap: warn. Second tap within 2s: confirm.
     if (!sendEndTurn._warned) {
       sendEndTurn._warned = true;
-      toast(`You still have ${gameState.actionsLeft} action${gameState.actionsLeft > 1 ? 's' : ''} left — tap Pass again to confirm.`, 'info');
+      toast(`You still have ${gameState.actionsLeft} action${gameState.actionsLeft > 1 ? 's' : ''} left. Tap Pass again to confirm.`, 'info');
       setTimeout(() => { sendEndTurn._warned = false; }, 2000);
       return;
     }
@@ -1910,7 +1944,7 @@ function startTimer(barId, wrapId) {
     return;
   }
   wrap.style.display = '';
-  timerSeconds = myDifficulty === 2 ? 20 : 10;
+  timerSeconds = myDifficulty === 2 ? 10 : 5;
 
   bar.style.transition = 'none';
   bar.style.width = '100%';
@@ -1924,7 +1958,7 @@ function startTimer(barId, wrapId) {
     const pct = Math.max(0, (remaining / timerSeconds) * 100);
     bar.style.width = pct + '%';
     if (pct < 30) bar.classList.add('danger');
-    if (remaining > 0 && remaining <= 3) {
+    if (remaining > 0 && remaining <= Math.min(3, Math.ceil(timerSeconds * 0.3))) {
       document.querySelector('.screen.active .math-big-card')?.classList.add('urgent');
     }
     if (remaining <= 0) {
@@ -1995,6 +2029,48 @@ document.addEventListener('keydown', e => {
     if (active.id === 's-wild-draw') submitWildDraw();
     if (active.id === 's-wild-resolve') submitWildResolve();
   }
+});
+
+// ─── How to Play (shows once per iPad, reopen from the title screen) ─────────
+const HOW_TO = [
+  { art: '/img/Wall-Stone.png', cover: true, title: 'Welcome to the Math Arena! ⚔️',
+    body: "Destroy all of your opponent's walls, then land a direct hit to win! Guard your own walls too, or your opponent can hit you!" },
+  { art: '/img/Attack-Sword.png', title: 'Attack and Build 🏰',
+    body: "Drag an attack card onto an enemy wall to smash it. Check the wall's hint first, because some walls block some weapons! To rebuild, drag a build card onto one of your empty wall spots." },
+  { art: '/img/Wild-RedPotion.png', title: 'Your Turn 🎯',
+    body: 'You get 3 actions every turn. Use them to shop, attack, or build. Solve the math problem to make your move count! And watch out: wild cards are for the brave!' },
+];
+let howToPage = 0;
+function renderHowTo() {
+  const p = HOW_TO[howToPage];
+  const art = document.getElementById('htp-art');
+  art.style.backgroundImage = `url('${p.art}')`;
+  art.classList.toggle('cover', !!p.cover);
+  document.getElementById('htp-title').textContent = p.title;
+  document.getElementById('htp-body').textContent = p.body;
+  document.querySelectorAll('#htp-dots span').forEach((d, i) => d.classList.toggle('on', i === howToPage));
+  document.getElementById('htp-next').textContent = howToPage === HOW_TO.length - 1 ? "Let's Play!" : 'Next →';
+  const card = document.querySelector('.howto-card');
+  anim(card, [{ transform: 'translateX(24px)', opacity: 0.4 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'ease-out' });
+}
+function openHowTo() {
+  howToPage = 0;
+  document.getElementById('howto').classList.remove('hidden');
+  renderHowTo();
+}
+function closeHowTo() {
+  document.getElementById('howto').classList.add('hidden');
+  try { localStorage.setItem('mcg-howto-seen', '1'); } catch (e) {}
+}
+function howToNext() {
+  SFX.play('select', 0.8);
+  if (howToPage < HOW_TO.length - 1) { howToPage++; renderHowTo(); }
+  else closeHowTo();
+}
+document.addEventListener('DOMContentLoaded', () => {
+  let seen = false;
+  try { seen = localStorage.getItem('mcg-howto-seen') === '1'; } catch (e) {}
+  if (!seen) openHowTo();
 });
 
 // ─── Auto-fill room code from URL (?join=XXXX) ───────────────────────────────
