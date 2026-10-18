@@ -23,6 +23,10 @@ app.use(express.static(path.join(__dirname, 'public'), {
   },
 }));
 
+// ─── Avatars & moods ─────────────────────────────────────────────────────────
+const MOODS = ['normal', 'attack', 'correct', 'wrong', 'worried', 'shopping'];
+const cleanAvatar = a => (typeof a === 'string' && /^avatar\d{1,2}$/.test(a)) ? a : 'avatar1';
+
 // ─── Room state ───────────────────────────────────────────────────────────────
 // rooms Map: roomCode → { p1: socketId, p2: socketId|null, p1Name, p2Name, p1Diff, p2Diff, state }
 const rooms = new Map();
@@ -42,7 +46,7 @@ io.on('connection', (socket) => {
   socket.emit('server_version', { version: SERVER_VERSION });
 
   // ── create_game ─────────────────────────────────────────────────────────────
-  socket.on('create_game', ({ name, difficulty }) => {
+  socket.on('create_game', ({ name, difficulty, avatar }) => {
     const roomCode = generateRoomCode();
     rooms.set(roomCode, {
       roomCode,
@@ -52,6 +56,8 @@ io.on('connection', (socket) => {
       p2Name: null,
       p1Diff: difficulty || 1,
       p2Diff: 1,
+      p1Avatar: cleanAvatar(avatar),
+      p2Avatar: 'avatar1',
       state: null,
     });
     socket.join(roomCode);
@@ -68,7 +74,7 @@ io.on('connection', (socket) => {
   });
 
   // ── join_game ────────────────────────────────────────────────────────────────
-  socket.on('join_game', ({ name, roomCode, difficulty }) => {
+  socket.on('join_game', ({ name, roomCode, difficulty, avatar }) => {
     const code = (roomCode || '').toUpperCase().trim();
     const room = rooms.get(code);
 
@@ -84,6 +90,7 @@ io.on('connection', (socket) => {
     room.p2 = socket.id;
     room.p2Name = name || 'Player 2';
     room.p2Diff = difficulty || 1;
+    room.p2Avatar = cleanAvatar(avatar);
 
     socket.join(code);
     socket.roomCode = code;
@@ -96,6 +103,7 @@ io.on('connection', (socket) => {
     // Notify host that P2 joined
     io.to(room.p1).emit('player_joined', {
       p2Name: room.p2Name,
+      p2Avatar: room.p2Avatar,
     });
 
     // Broadcast lobby state to both
@@ -105,7 +113,15 @@ io.on('connection', (socket) => {
       p2Name: room.p2Name,
       p1Diff: room.p1Diff,
       p2Diff: room.p2Diff,
+      p1Avatar: room.p1Avatar,
+      p2Avatar: room.p2Avatar,
     });
+  });
+
+  // ── set_mood: relay a player's avatar mood to their opponent ────────────────
+  socket.on('set_mood', ({ mood } = {}) => {
+    if (!socket.roomCode || !MOODS.includes(mood)) return;
+    socket.to(socket.roomCode).emit('opponent_mood', { mood });
   });
 
   // ── start_game ───────────────────────────────────────────────────────────────

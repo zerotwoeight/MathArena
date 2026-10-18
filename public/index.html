@@ -45,6 +45,7 @@
     <div class="logo" style="font-size:var(--fs-xl);">⚔ Create Game</div>
     <div class="lobby-panel">
       <input id="host-name" class="text-input" type="text" placeholder="Your name" maxlength="16" autocomplete="off">
+      <div class="avatar-pick-wrap"><div class="diff-label">Avatar</div><div class="avatar-picker"></div></div>
       <div class="diff-wrap">
         <div class="diff-label">Difficulty</div>
         <div class="diff-stars" id="host-diff-stars">
@@ -65,6 +66,7 @@
   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(14px,4.5vw,22px);padding:clamp(16px,5vw,28px);">
     <div class="logo" style="font-size:var(--fs-xl);">Waiting for Player 2…</div>
     <div class="lobby-panel" style="align-items:center;gap:clamp(14px,4.5vw,20px);">
+      <div class="vs-row" id="host-vs"></div>
       <div class="text-dim cinzel" style="font-size:var(--fs-xs);letter-spacing:0.14em;text-transform:uppercase;">Room Code</div>
       <div class="room-code" id="host-room-code">----</div>
 
@@ -92,6 +94,7 @@
     <div class="logo" style="font-size:var(--fs-xl);">⚔ Join Game</div>
     <div class="lobby-panel">
       <input id="client-name" class="text-input" type="text" placeholder="Your name" maxlength="16" autocomplete="off">
+      <div class="avatar-pick-wrap"><div class="diff-label">Avatar</div><div class="avatar-picker"></div></div>
       <input id="client-code" class="text-input" type="text" placeholder="Room code (e.g. XK47)" maxlength="4"
              autocomplete="off" style="text-transform:uppercase;letter-spacing:0.2em;font-size:var(--fs-lg);font-weight:900;text-align:center;">
       <div class="diff-wrap">
@@ -116,6 +119,7 @@
     <div class="logo" style="font-size:var(--fs-xl);">Connected!</div>
     <div class="lobby-panel" style="align-items:center;text-align:center;gap:clamp(12px,3.5vw,18px);">
       <div class="text-dim" style="font-size:var(--fs-sm);">Waiting for host to start…</div>
+      <div class="vs-row" id="client-vs"></div>
       <div id="client-wait-names" class="text-dim" style="font-size:var(--fs-xs);"></div>
       <div style="display:flex;gap:8px;align-items:center;">
         <div class="wait-dot"></div>
@@ -147,7 +151,10 @@
 
     <!-- Enemy zone -->
     <div class="enemy-zone">
-      <div class="zone-label" id="enemy-name-label">Enemy Walls</div>
+      <div class="zone-head">
+        <div class="avatar-portrait sm" id="game-opp-avatar"></div>
+        <div class="zone-label" id="enemy-name-label">Enemy Walls</div>
+      </div>
       <div class="wall-row" id="enemy-walls"></div>
       <!-- Direct attack banner — visible only when all enemy walls gone and it's your turn -->
       <div id="direct-attack-banner" class="hidden" style="
@@ -243,7 +250,7 @@
 <div id="s-waiting" class="screen">
   <div class="wait-screen">
     <div class="wait-enemy-section">
-      <div class="wait-avatar" id="wait-enemy-avatar">🧙</div>
+      <div class="avatar-portrait lg" id="wait-enemy-avatar"></div>
       <div class="wait-name" id="wait-enemy-name">Opponent</div>
       <div class="wait-badge">
         <div class="wait-dot"></div>
@@ -273,7 +280,7 @@
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
 // Version: bump this AND "version" in package.json together.
-const CLIENT_VERSION = '1.2.0';
+const CLIENT_VERSION = '1.3.1';
 const socket = io();
 let myPlayerId = null;
 let myDifficulty = 1;
@@ -611,6 +618,7 @@ async function showAnswerReveal(answer) {
 async function playFx({ actor, fx }) {
   if (!fx) return;
   const mine = actor === myPlayerId;
+  moodFromFx(fx, mine);
   if (mine && awaiting) await fxAnswerResult(fx);
 
   if (fx.kind === 'smash' || fx.kind === 'blocked') {
@@ -632,6 +640,113 @@ async function playFx({ actor, fx }) {
 }
 
 
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  AVATARS & MOODS
+//  Files: /img/<id>_<mood>.png  (normal, attack, correct, wrong, worried, shopping)
+//  To add an avatar: drop the 6 files in public/img and put its id in a slot below.
+// ═══════════════════════════════════════════════════════════════════════════
+const AVATAR_SLOTS = ['avatar1', 'avatar2', null, null];   // null = "Coming soon"
+const MOOD_LIST = ['normal', 'attack', 'correct', 'wrong', 'worried', 'shopping'];
+const avatarSrc = (id, mood = 'normal') => `/img/${id}_${mood}.png`;
+
+let myAvatar = 'avatar1';
+try { const saved = localStorage.getItem('mcg-avatar'); if (saved && AVATAR_SLOTS.includes(saved)) myAvatar = saved; } catch (e) {}
+
+const _preloaded = new Set();
+function preloadAvatar(id) {
+  if (!id || _preloaded.has(id)) return;
+  _preloaded.add(id);
+  MOOD_LIST.forEach(m => { const i = new Image(); i.src = avatarSrc(id, m); });
+}
+
+function buildAvatarPickers() {
+  document.querySelectorAll('.avatar-picker').forEach(wrap => {
+    wrap.innerHTML = AVATAR_SLOTS.map((id, i) => id
+      ? `<button type="button" class="avatar-opt${id === myAvatar ? ' on' : ''}" data-id="${id}" aria-label="Avatar ${i + 1}"><img src="${avatarSrc(id)}" alt=""></button>`
+      : `<div class="avatar-opt locked" aria-label="Coming soon"><span>?</span><small>Soon</small></div>`).join('');
+    wrap.querySelectorAll('button.avatar-opt').forEach(btn => btn.addEventListener('click', () => {
+      myAvatar = btn.dataset.id;
+      try { localStorage.setItem('mcg-avatar', myAvatar); } catch (e) {}
+      SFX.play('select');
+      buildAvatarPickers();
+      document.querySelectorAll(`.avatar-opt.on`).forEach(el => anim(el, [
+        { transform: 'scale(1)' }, { transform: 'scale(1.18)' }, { transform: 'scale(1)' },
+      ], { duration: 320, easing: 'cubic-bezier(.3,1.6,.5,1)' }));
+    }));
+  });
+}
+document.addEventListener('DOMContentLoaded', () => { buildAvatarPickers(); preloadAvatar(myAvatar); });
+
+// Put a portrait image in a frame; pop it when the face changes
+function setPortrait(el, id, mood, pop) {
+  if (!el) return;
+  let img = el.querySelector('img');
+  if (!img) { el.innerHTML = '<img alt="">'; img = el.querySelector('img'); }
+  const src = avatarSrc(id, mood);
+  if (img.getAttribute('src') === src) return;
+  img.setAttribute('src', src);
+  if (pop && el.offsetParent) anim(el, [
+    { transform: 'scale(1) rotate(0)' }, { transform: 'scale(1.15) rotate(-4deg)' },
+    { transform: 'scale(0.96) rotate(2deg)' }, { transform: 'scale(1) rotate(0)' },
+  ], { duration: 380, easing: 'ease-out' });
+}
+
+function renderVs(containerId, leftId, leftName, rightId, rightName) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const side = (id, name) => `<div class="vs-side"><div class="avatar-portrait md${id ? '' : ' empty'}">${id ? `<img src="${avatarSrc(id)}" alt="">` : '<span>?</span>'}</div><div class="vs-name"></div></div>`;
+  el.innerHTML = side(leftId, leftName) + '<div class="vs-mid">VS</div>' + side(rightId, rightName);
+  const names = el.querySelectorAll('.vs-name');
+  names[0].textContent = leftName || '';
+  names[1].textContent = rightName || '';
+}
+
+// ── Opponent's face (driven by their moods, relayed by the server)
+let oppAvatar = null, oppMood = 'normal';
+function showOppMood(mood) {
+  if (!MOOD_LIST.includes(mood)) return;
+  oppMood = mood;
+  ['game-opp-avatar', 'wait-enemy-avatar'].forEach(id =>
+    setPortrait(document.getElementById(id), oppAvatar || 'avatar1', mood, true));
+}
+
+// ── My face (only the opponent sees it; we send each change to the server)
+let myMoodNow = 'normal', moodTimer = null, moodHeld = false;
+function restMood() {
+  const me = gameState?.players?.[myPlayerId];
+  const standing = me ? me.walls.filter(w => w.active).length : 3;
+  return standing <= 1 ? 'worried' : 'normal';
+}
+function emitMood(m) {
+  if (m === myMoodNow || !myPlayerId) return;
+  myMoodNow = m;
+  socket.emit('set_mood', { mood: m });
+}
+function setMyMood(m, hold = 2200) {            // show a mood briefly, then rest
+  clearTimeout(moodTimer); moodHeld = false;
+  emitMood(m);
+  moodTimer = setTimeout(() => { moodTimer = null; emitMood(restMood()); }, hold);
+}
+function holdMood(m) {                          // keep a mood until released (aiming, shopping)
+  clearTimeout(moodTimer); moodTimer = null; moodHeld = true;
+  emitMood(m);
+}
+function releaseMood() {
+  moodHeld = false;
+  if (!moodTimer) emitMood(restMood());
+}
+function moodFromFx(fx, mine) {
+  if (mine) {
+    if (fx.kind === 'wrong' || fx.kind === 'blocked') setMyMood('wrong');
+    else if (fx.kind === 'smash' || fx.kind === 'direct') setMyMood('attack');
+    else if (fx.lostWalls?.length) setMyMood('worried', 2600);
+    else if (['correct', 'built', 'wild'].includes(fx.kind)) setMyMood('correct');
+  } else if (fx.kind === 'smash' || fx.kind === 'direct' || (fx.kind === 'wild' && fx.stolen)) {
+    setMyMood('worried', 2600);                 // they hit my wall or stole my cards
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  CARD ART
@@ -1143,7 +1258,8 @@ function hostCreate() {
   const name = document.getElementById('host-name').value.trim() || 'Player 1';
   const difficulty = getHostDiff ? getHostDiff() : 1;
   myDifficulty = difficulty;
-  socket.emit('create_game', { name, difficulty });
+  socket.emit('create_game', { name, difficulty, avatar: myAvatar });
+  renderVs('host-vs', myAvatar, name, null, 'Waiting…');
 }
 
 // ─── Client join ─────────────────────────────────────────────────────────────
@@ -1160,7 +1276,7 @@ function clientJoin() {
     return;
   }
   myDifficulty = difficulty;
-  socket.emit('join_game', { name, roomCode, difficulty });
+  socket.emit('join_game', { name, roomCode, difficulty, avatar: myAvatar });
 }
 
 // ─── Host start ──────────────────────────────────────────────────────────────
@@ -1210,16 +1326,22 @@ socket.on('join_error', ({ message }) => {
   errEl.classList.remove('hidden');
 });
 
-socket.on('player_joined', ({ p2Name }) => {
+socket.on('player_joined', ({ p2Name, p2Avatar }) => {
+  const myName = document.getElementById('host-name').value.trim() || 'Player 1';
+  renderVs('host-vs', myAvatar, myName, p2Avatar || 'avatar1', p2Name);
+  preloadAvatar(p2Avatar || 'avatar1');
   document.getElementById('host-wait-status').textContent = `${p2Name} joined! Ready to start.`;
   document.getElementById('host-start-btn').classList.remove('hidden');
   toast(`${p2Name} joined the room!`, 'success');
 });
 
-socket.on('lobby_state', ({ roomCode, p1Name, p2Name, p1Diff, p2Diff }) => {
-  document.getElementById('client-wait-names').textContent =
-    `${p1Name} (Host) vs ${p2Name}`;
+socket.on('lobby_state', ({ roomCode, p1Name, p2Name, p1Diff, p2Diff, p1Avatar, p2Avatar }) => {
+  document.getElementById('client-wait-names').textContent = '';
+  renderVs('client-vs', p2Avatar || myAvatar, p2Name, p1Avatar || 'avatar1', `${p1Name} (Host)`);
+  preloadAvatar(p1Avatar || 'avatar1');
 });
+
+socket.on('opponent_mood', ({ mood }) => showOppMood(mood));
 
 // Every visual event runs in order through this chain, so an animation is
 // never cut off by the next board redraw.
@@ -1363,6 +1485,9 @@ function renderGame(state) {
   turnBadge.className = `turn-badge${isMyTurn ? ' my-turn' : ''}`;
   document.getElementById('round-label').textContent = `Round ${state.round}`;
   document.getElementById('enemy-name-label').textContent = `${opp.name}'s Walls`;
+  if (opp.avatar && opp.avatar !== oppAvatar) { oppAvatar = opp.avatar; preloadAvatar(oppAvatar); }
+  ['game-opp-avatar', 'wait-enemy-avatar'].forEach(id => setPortrait(document.getElementById(id), oppAvatar || 'avatar1', oppMood, false));
+  if (!moodTimer && !moodHeld) emitMood(restMood());
 
   // Walls & hand
   renderWalls('enemy-walls', opp.walls, isMyTurn, 'enemy');
@@ -1529,10 +1654,12 @@ function handleAttackCard(card) {
   if (selectedAttackCard?.id === card.id) {
     selectedAttackCard = null;
     clearWallHighlights();
+    releaseMood();
     if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
     return;
   }
   selectedAttackCard = card;
+  holdMood('attack');
   if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
   toast('Tap an enemy wall, or drag the card onto it', 'info');
   highlightEnemyWalls();
@@ -1776,7 +1903,7 @@ function setupTouchDrag(el, card) {
       if (Math.hypot(t.clientX - startX, t.clientY - startY) < 8) return;
       dragging = true;
       draggedCard = card;
-      if (isAtk) { selectedAttackCard = card; highlightEnemyWalls(); }
+      if (isAtk) { selectedAttackCard = card; highlightEnemyWalls(); holdMood('attack'); }
       else       { selectedBuildCard  = card; highlightOwnWallSlots(); }
       ghost = el.cloneNode(true);
       ghost.classList.remove('lift', 'deal-in');
@@ -1837,6 +1964,7 @@ function setupTouchDrag(el, card) {
     selectedAttackCard = null; selectedBuildCard = null;
     finish();
     springBack();
+    releaseMood();
   }, { passive: false });
 
   el.addEventListener('touchcancel', () => {
@@ -1859,6 +1987,7 @@ function openShop() {
     toast("It's not your turn!", 'error');
     return;
   }
+  holdMood('shopping');
   const container = document.getElementById('shop-piles');
   container.innerHTML = '';
   PILE_DEFS.forEach(p => {
@@ -1868,14 +1997,15 @@ function openShop() {
     div.addEventListener('click', () => {
       SFX.play('select');
       socket.emit('shop_pick', { pileType: p.key });
-      closeShop();
+      closeShop(true);
     });
     container.appendChild(div);
   });
   showScreen('s-shop');
 }
 
-function closeShop() {
+function closeShop(picked) {
+  if (!picked) releaseMood(); // backed out without buying
   if (gameState && gameState.currentTurn === myPlayerId) showScreen('s-game');
   else showScreen('s-waiting');
 }

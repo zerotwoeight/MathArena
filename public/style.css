@@ -1094,3 +1094,49 @@ html, body {
   user-select: text; -webkit-user-select: text;
 }
 .version-tag.mismatch { color: #ff8899; opacity: 1; }
+
+/* ═══ Avatars ═════════════════════════════════════════════════════════════ */
+.avatar-pick-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.avatar-picker { display: flex; gap: clamp(8px, 2.5vw, 14px); justify-content: center; }
+.avatar-opt {
+  width: clamp(54px, 15vw, 76px); aspect-ratio: 1; border-radius: 50%;
+  border: 2px solid var(--rim-hi); background: #fff; padding: 0; overflow: hidden;
+  cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.avatar-opt img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-opt.on { border: 3px solid var(--gold-hi); box-shadow: 0 0 14px rgba(232,200,78,0.7); }
+.avatar-opt:not(.on):not(.locked):hover { transform: scale(1.05); }
+.avatar-opt.locked {
+  background: var(--surface2); border-style: dashed; cursor: default;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--text-dim); opacity: 0.6;
+}
+.avatar-opt.locked span { font-family: 'Cinzel', serif; font-size: var(--fs-lg); line-height: 1; }
+.avatar-opt.locked small { font-size: var(--fs-xs); }
+
+/* Portrait frames */
+.avatar-portrait {
+  border-radius: 50%; overflow: hidden; background: #fff; flex-shrink: 0;
+  border: 3px solid var(--gold); box-shadow: 0 0 12px rgba(200,164,40,0.35), 0 4px 10px rgba(0,0,0,0.5);
+  aspect-ratio: 1;
+}
+.avatar-portrait img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar-portrait.sm { width: clamp(52px, 13vw, 88px); border-width: 3px; }
+.avatar-portrait.md { width: clamp(70px, 20vw, 110px); }
+.avatar-portrait.lg { width: clamp(130px, 38vw, 220px); border-width: 4px; }
+.avatar-portrait.empty {
+  background: var(--surface2); border-style: dashed; border-color: var(--rim-hi); box-shadow: none;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Cinzel', serif; font-size: var(--fs-xl); color: var(--text-dim);
+}
+
+/* Enemy zone header: portrait + "Bot's Walls" */
+.zone-head { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: clamp(6px,2vw,10px); }
+.zone-head .zone-label { margin-bottom: 0; }
+
+/* Lobby "You VS Opponent" */
+.vs-row { display: flex; align-items: center; justify-content: center; gap: clamp(10px, 4vw, 22px); }
+.vs-row:empty { display: none; }
+.vs-side { display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 120px; }
+.vs-name { font-size: var(--fs-xs); color: var(--text); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+.vs-mid { font-family: 'Cinzel', serif; font-weight: 900; font-size: var(--fs-lg); color: var(--gold-hi); text-shadow: 0 0 12px rgba(232,200,78,0.6); }

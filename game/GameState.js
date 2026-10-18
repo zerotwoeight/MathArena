@@ -40,6 +40,7 @@ class GameState {
       p1: {
         socketId: room.p1,
         name: room.p1Name || 'Player 1',
+        avatar: room.p1Avatar || 'avatar1',
         isHost: true,
         hand:  drawStartingHand(this.piles.attack),
         walls: buildStartingWalls(),
@@ -47,6 +48,7 @@ class GameState {
       p2: {
         socketId: room.p2,
         name: room.p2Name || 'Player 2',
+        avatar: room.p2Avatar || 'avatar1',
         isHost: false,
         hand:  drawStartingHand(this.piles.attack),
         walls: buildStartingWalls(),
@@ -81,6 +83,7 @@ class GameState {
     const p = this.players[id];
     return {
       name:   p.name,
+      avatar: p.avatar,
       isHost: p.isHost,
       hand:   p.hand,
       walls:  p.walls,
