@@ -1140,3 +1140,54 @@ html, body {
 .vs-side { display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 120px; }
 .vs-name { font-size: var(--fs-xs); color: var(--text); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
 .vs-mid { font-family: 'Cinzel', serif; font-weight: 900; font-size: var(--fs-lg); color: var(--gold-hi); text-shadow: 0 0 12px rgba(232,200,78,0.6); }
+
+/* ═══ Number pad ══════════════════════════════════════════════════════════ */
+.numpad {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: clamp(6px, 1.8vw, 10px); width: 100%;
+}
+.np-key {
+  height: clamp(44px, 7.2vh, 66px);
+  border-radius: 12px;
+  border: 1.5px solid var(--rim-hi);
+  background: linear-gradient(180deg, var(--surface2), var(--surface));
+  color: var(--text);
+  font-family: 'Exo 2', sans-serif; font-weight: 900; font-size: var(--fs-lg);
+  cursor: pointer; touch-action: manipulation;
+  -webkit-user-select: none; user-select: none;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.45);
+  transition: transform 0.06s, box-shadow 0.06s, background 0.06s;
+}
+.np-key.np-fn { color: var(--text-dim); font-size: var(--fs-md); }
+.np-key.down, .np-key:active {
+  transform: translateY(2px) scale(0.97);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.45);
+  background: linear-gradient(180deg, #2a3350, var(--surface2));
+  border-color: var(--gold);
+}
+.math-input[readonly] { cursor: default; caret-color: transparent; }
+.math-input:disabled { opacity: 0.6; }
+
+/* Keep the question card, answer, pad and Solve all on screen */
+.math-modal-inner { gap: clamp(8px, 1.6vh, 16px); width: min(clamp(220px, 62vw, 320px), 92vw); }
+.math-big-card.art-card { width: min(100%, 30vh); }
+/* Landscape iPad: card on the left, answer + pad on the right */
+@media (orientation: landscape) and (max-height: 900px) {
+  .math-modal-inner {
+    display: grid; grid-template-columns: auto minmax(240px, 320px);
+    grid-auto-flow: dense; column-gap: clamp(16px, 3vw, 32px); align-items: center;
+    width: auto; max-width: 94vw;
+  }
+  .math-modal-inner > .math-big-card { grid-column: 1; grid-row: 1 / span 4; width: min(40vh, 300px); }
+  .math-modal-inner > :not(.math-big-card) { grid-column: 2; }
+}
+
+/* ═══ Rematch ═════════════════════════════════════════════════════════════ */
+.rematch-status { min-height: 1.4em; font-size: var(--fs-sm); color: var(--gold-hi); text-align: center; }
+#rematch-btn.pulse { animation: rematch-pulse 1s ease-in-out infinite; }
+@keyframes rematch-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 8px rgba(232,200,78,0.4); }
+  50%      { transform: scale(1.05); box-shadow: 0 0 24px rgba(232,200,78,0.9); }
+}
+#rematch-btn:disabled { opacity: 0.7; cursor: default; }
+@media (prefers-reduced-motion: reduce) { #rematch-btn.pulse { animation: none; } }

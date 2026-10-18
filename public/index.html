@@ -270,7 +270,9 @@
     <div class="gameover-panel">
       <div class="gameover-title" id="gameover-title">Victory!</div>
       <div class="gameover-sub" id="gameover-sub">You defeated your opponent!</div>
-      <button class="btn btn-gold" onclick="location.reload()">Play Again</button>
+      <div class="rematch-status" id="rematch-status"></div>
+      <button class="btn btn-gold" id="rematch-btn" onclick="requestRematch()">⚔️ Rematch</button>
+      <button class="btn btn-ghost" id="leave-btn" onclick="leaveRoom()">Leave</button>
     </div>
   </div>
 </div>
@@ -280,7 +282,7 @@
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
 // Version: bump this AND "version" in package.json together.
-const CLIENT_VERSION = '1.3.1';
+const CLIENT_VERSION = '1.4.0';
 const socket = io();
 let myPlayerId = null;
 let myDifficulty = 1;
@@ -647,7 +649,7 @@ async function playFx({ actor, fx }) {
 //  Files: /img/<id>_<mood>.png  (normal, attack, correct, wrong, worried, shopping)
 //  To add an avatar: drop the 6 files in public/img and put its id in a slot below.
 // ═══════════════════════════════════════════════════════════════════════════
-const AVATAR_SLOTS = ['avatar1', 'avatar2', null, null];   // null = "Coming soon"
+const AVATAR_SLOTS = ['avatar1', 'avatar2', 'avatar3', 'avatar4'];   // null = "Coming soon"
 const MOOD_LIST = ['normal', 'attack', 'correct', 'wrong', 'worried', 'shopping'];
 const avatarSrc = (id, mood = 'normal') => `/img/${id}_${mood}.png`;
 
@@ -1386,6 +1388,7 @@ async function showGameOver(winner) {
   document.getElementById('gameover-sub').textContent = isWinner
     ? `You defeated ${oppName}!`
     : `${winnerName} wins! Better luck next time!`;
+  resetRematchUI();
   const screen = document.getElementById('s-gameover');
   const panel = screen.querySelector('.gameover-panel');
   panel.classList.remove('win', 'lose');
@@ -1403,8 +1406,9 @@ async function showGameOver(winner) {
   }
 }
 
-socket.on('opponent_disconnected', () => {
+socket.on('opponent_disconnected', ({ name } = {}) => {
   stopTimer();
+  if (document.getElementById('s-gameover').classList.contains('active')) { opponentGone(name, 'disconnected'); return; }
   showDisconnectOverlay('Opponent disconnected', 'They left the game. Return to the lobby to start a new game.');
 });
 
@@ -2036,7 +2040,6 @@ function showMathChallenge(challenge) {
     showScreen('s-wild-draw');
     introMathCard(document.getElementById('s-wild-draw'), 'flip');
     document.getElementById('wild-draw-answer').value = '';
-    document.getElementById('wild-draw-answer').focus();
     return;
   }
 
@@ -2048,7 +2051,6 @@ function showMathChallenge(challenge) {
     showScreen('s-wild-resolve');
     introMathCard(document.getElementById('s-wild-resolve'), 'flip');
     document.getElementById('wild-resolve-answer').value = '';
-    document.getElementById('wild-resolve-answer').focus();
     return;
   }
 
@@ -2061,7 +2063,6 @@ function showMathChallenge(challenge) {
   showScreen('s-math');
   introMathCard(document.getElementById('s-math'), (action === 'attack' || action === 'build') ? 'zoom' : 'flip');
   document.getElementById('math-answer').value = '';
-  document.getElementById('math-answer').focus();
 }
 
 function startTimer(barId, wrapId) {
@@ -2146,12 +2147,114 @@ function shakeMathInput(id) {
   el.style.animation = 'none';
   el.offsetHeight; // reflow
   el.style.animation = 'shake 0.35s ease';
-  el.focus();
   setTimeout(() => el.style.animation = '', 400);
 }
 
-// ─── Enter key support ───────────────────────────────────────────────────────
+// ─── Rematch ─────────────────────────────────────────────────────────────────
+function oppName() {
+  const oppId = myPlayerId === 'p1' ? 'p2' : 'p1';
+  return gameState?.players?.[oppId]?.name || 'Your opponent';
+}
+function resetRematchUI() {
+  const btn = document.getElementById('rematch-btn');
+  btn.disabled = false; btn.classList.remove('hidden', 'pulse'); btn.textContent = '⚔️ Rematch';
+  document.getElementById('leave-btn').classList.remove('btn-gold'); document.getElementById('leave-btn').classList.add('btn-ghost');
+  document.getElementById('rematch-status').textContent = '';
+}
+function requestRematch() {
+  SFX.play('select');
+  const btn = document.getElementById('rematch-btn');
+  btn.disabled = true; btn.classList.remove('pulse');
+  btn.textContent = `Waiting for ${oppName()}…`;
+  socket.emit('rematch_request');
+}
+function leaveRoom() {
+  socket.emit('leave_room');
+  setTimeout(() => location.reload(), 150);
+}
+function opponentGone(name, how) {
+  document.getElementById('rematch-btn').classList.add('hidden');
+  document.getElementById('rematch-status').textContent = `${name || oppName()} ${how === 'left' ? 'left the game' : 'disconnected'}.`;
+  const leave = document.getElementById('leave-btn');
+  leave.classList.remove('btn-ghost'); leave.classList.add('btn-gold');
+  leave.textContent = 'Back to Title';
+}
+socket.on('rematch_status', ({ ready }) => {
+  const oppId = myPlayerId === 'p1' ? 'p2' : 'p1';
+  if (ready.includes(oppId) && !ready.includes(myPlayerId)) {
+    document.getElementById('rematch-status').textContent = `${oppName()} wants a rematch!`;
+    document.getElementById('rematch-btn').classList.add('pulse');
+    SFX.play('select');
+  }
+});
+socket.on('opponent_left', ({ name }) => queueFx(() => {
+  if (document.getElementById('s-gameover').classList.contains('active')) opponentGone(name, 'left');
+  else showDisconnectOverlay('Opponent left', `${name || 'Your opponent'} left the game.`);
+}));
+socket.on('rematch_start', () => queueFx(resetForNewGame));
+
+// Clear everything left over from the last game on this iPad
+function resetForNewGame() {
+  stopTimer();
+  endAwait();
+  pendingChallenge = null;
+  selectedAttackCard = null; selectedBuildCard = null; draggedCard = null; lastDropPoint = null;
+  Object.keys(_prevWalls).forEach(k => delete _prevWalls[k]);
+  _prevHandIds = new Set();
+  giftIds.clear(); suppressFlash.clear();
+  renderGame._prevTurn = undefined; renderGame._prevActions = undefined;
+  oppMood = 'normal';
+  clearTimeout(moodTimer); moodTimer = null; moodHeld = false;
+  myMoodNow = null; emitMood('normal');
+  document.getElementById('s-gameover').classList.remove('lose');
+  document.querySelector('#s-gameover .gameover-panel').classList.remove('win', 'lose');
+  document.getElementById('action-log').innerHTML = '&nbsp;';
+}
+
+// ─── Number pad (no iPad keyboard) ───────────────────────────────────────────
+// Each answer screen gets a big on-screen pad. The answer box is read-only so the
+// iPad keyboard never opens. A real keyboard still works (digits, Backspace, Enter).
+const ANSWER_INPUTS = { 's-math': 'math-answer', 's-wild-draw': 'wild-draw-answer', 's-wild-resolve': 'wild-resolve-answer' };
+const SUBMITS = { 's-math': () => submitMath(), 's-wild-draw': () => submitWildDraw(), 's-wild-resolve': () => submitWildResolve() };
+const MAX_DIGITS = 4;
+
+function padPress(screenId, key) {
+  const input = document.getElementById(ANSWER_INPUTS[screenId]);
+  if (!input || input.disabled) return;
+  if (key === 'del') input.value = input.value.slice(0, -1);
+  else if (key === 'clr') input.value = '';
+  else if (input.value.length < MAX_DIGITS) input.value = (input.value === '0' ? '' : input.value) + key;
+  SFX.play('select', 0.45);
+}
+function buildNumpads() {
+  Object.entries(ANSWER_INPUTS).forEach(([screenId, inputId]) => {
+    const input = document.getElementById(inputId);
+    input.readOnly = true;
+    input.setAttribute('inputmode', 'none');
+    input.setAttribute('tabindex', '-1');
+    input.type = 'text';
+    const pad = document.createElement('div');
+    pad.className = 'numpad';
+    const keys = ['1','2','3','4','5','6','7','8','9','clr','0','del'];
+    pad.innerHTML = keys.map(k => `<button type="button" class="np-key${k.length > 1 ? ' np-fn' : ''}" data-k="${k}">${k === 'del' ? '⌫' : k === 'clr' ? 'C' : k}</button>`).join('');
+    pad.addEventListener('pointerdown', e => {
+      const b = e.target.closest('.np-key'); if (!b) return;
+      e.preventDefault();
+      b.classList.add('down'); setTimeout(() => b.classList.remove('down'), 120);
+      padPress(screenId, b.dataset.k);
+    });
+    input.insertAdjacentElement('afterend', pad);
+  });
+}
+document.addEventListener('DOMContentLoaded', buildNumpads);
+
+// ─── Keyboard support (Enter, digits, Backspace) ─────────────────────────────
 document.addEventListener('keydown', e => {
+  const activeScr = document.querySelector('.screen.active');
+  if (activeScr && ANSWER_INPUTS[activeScr.id]) {
+    if (/^[0-9]$/.test(e.key)) { padPress(activeScr.id, e.key); e.preventDefault(); return; }
+    if (e.key === 'Backspace') { padPress(activeScr.id, 'del'); e.preventDefault(); return; }
+  }
   if (e.key === 'Enter') {
     const active = document.querySelector('.screen.active');
     if (!active) return;

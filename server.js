@@ -226,6 +226,40 @@ io.on('connection', (socket) => {
     handleActionResult(socket, room, result);
   });
 
+  // ── rematch: both players tap Rematch → fresh game, same room/names/avatars ─
+  socket.on('rematch_request', () => {
+    const code = socket.roomCode;
+    const room = rooms.get(code);
+    if (!room || !room.state || room.state.phase !== 'gameover' || !room.p2) return;
+    room.rematch = room.rematch || new Set();
+    room.rematch.add(socket.playerId);
+    io.to(code).emit('rematch_status', { ready: [...room.rematch] });
+
+    if (room.rematch.has('p1') && room.rematch.has('p2')) {
+      const loser = room.state.winner === 'p1' ? 'p2' : 'p1';
+      room.rematch = null;
+      const GameState = require('./game/GameState');
+      const gs = new GameState(room);
+      gs.currentTurn = loser;           // the player who lost goes first
+      room.state = gs;
+      console.log(`[game] ${code} rematch (${loser} starts)`);
+      io.to(code).emit('rematch_start', {});
+      io.to(code).emit('game_state', { state: gs.getPublicState() });
+    }
+  });
+
+  // ── leave_room: player taps Leave on the game over screen ──────────────────
+  socket.on('leave_room', () => {
+    const code = socket.roomCode;
+    const room = rooms.get(code);
+    if (!room) return;
+    const name = socket.playerId === 'p1' ? room.p1Name : room.p2Name;
+    socket.to(code).emit('opponent_left', { name });
+    socket.leave(code);
+    socket.roomCode = null;
+    rooms.delete(code);
+  });
+
   // ── disconnect ───────────────────────────────────────────────────────────────
   socket.on('disconnect', () => {
     console.log(`[disconnect] ${socket.id}`);
