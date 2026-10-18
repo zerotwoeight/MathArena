@@ -1191,3 +1191,21 @@ html, body {
 }
 #rematch-btn:disabled { opacity: 0.7; cursor: default; }
 @media (prefers-reduced-motion: reduce) { #rematch-btn.pulse { animation: none; } }
+
+/* ═══ Fit shorter screens (older iPads, Safari tab bar, landscape) ═══════════
+   Card sizes are capped by screen HEIGHT as well as width so the hand,
+   Shop/Pass buttons and both wall rows always fit without overlapping. */
+:root {
+  --wall-w: min(clamp(70px, 22vw, 160px), 12.5vh);
+  --own-w:  min(clamp(54px, 17vw, 120px), 10vh);
+  --hand-w: min(clamp(58px, 18vw, 132px), 12vh);
+}
+.avatar-portrait.sm { width: min(clamp(52px, 13vw, 88px), 6.5vh); }
+.hand-zone { min-height: 0; }
+.action-row { position: relative; z-index: 2; }
+@media (max-height: 760px) {
+  .enemy-zone, .own-zone { padding-top: 4px; padding-bottom: 4px; }
+  .hand-zone { padding-top: 4px; padding-bottom: 4px; gap: 4px; }
+  .zone-label { margin-bottom: 4px; }
+  .zone-head { margin-bottom: 4px; }
+}
