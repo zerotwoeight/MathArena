@@ -1,6 +1,6 @@
 {
   "name": "math-card-game",
-  "version": "1.4.1",
+  "version": "1.4.4",
   "description": "Multiplayer math card game for kids",
   "main": "server.js",
   "scripts": {

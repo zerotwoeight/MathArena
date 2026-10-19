@@ -282,7 +282,7 @@
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
 // Version: bump this AND "version" in package.json together.
-const CLIENT_VERSION = '1.4.1';
+const CLIENT_VERSION = '1.4.4';
 const socket = io();
 let myPlayerId = null;
 let myDifficulty = 1;
@@ -651,7 +651,25 @@ async function playFx({ actor, fx }) {
 // ═══════════════════════════════════════════════════════════════════════════
 const AVATAR_SLOTS = ['avatar1', 'avatar2', 'avatar3', 'avatar4'];   // null = "Coming soon"
 const MOOD_LIST = ['normal', 'attack', 'correct', 'wrong', 'worried', 'shopping'];
-const avatarSrc = (id, mood = 'normal') => `/img/${id}_${mood}.png`;
+// Avatars listed here use animated WebPs from /img/anim/ instead of the still PNGs.
+// (WebPs are converted from the GIFs: same look, about 1/3 the size.)
+// Remove an id from this list to switch that avatar back to stills.
+const ANIMATED_AVATARS = ['avatar1', 'avatar4'];
+let animFailed = false;   // set if this iPad can't show animated WebP → stills from then on
+const avatarSrc = (id, mood = 'normal') => (ANIMATED_AVATARS.includes(id) && !animFailed)
+  ? `/img/anim/${id}_${mood}.webp`
+  : `/img/${id}_${mood}.png`;
+
+// Fallback: if an animated WebP fails to load or decode, swap that image to the
+// matching still PNG (same name, /img/ folder) and use stills for the rest of the visit.
+document.addEventListener('error', e => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement)) return;
+  const m = (img.getAttribute('src') || '').match(/\/img\/anim\/(avatar\d+)_(\w+)\.webp$/);
+  if (!m) return;
+  animFailed = true;
+  img.setAttribute('src', `/img/${m[1]}_${m[2]}.png`);
+}, true);
 
 let myAvatar = 'avatar1';
 try { const saved = localStorage.getItem('mcg-avatar'); if (saved && AVATAR_SLOTS.includes(saved)) myAvatar = saved; } catch (e) {}
