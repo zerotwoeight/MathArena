@@ -156,23 +156,12 @@
         <div class="zone-label" id="enemy-name-label">Enemy Walls</div>
       </div>
       <div class="wall-row" id="enemy-walls"></div>
-      <!-- Direct attack banner — visible only when all enemy walls gone and it's your turn -->
-      <div id="direct-attack-banner" class="hidden" style="
-        margin-top: clamp(8px,2.5vw,12px);
-        display: flex; justify-content: center;">
-        <button onclick="handleDirectAttack()" style="
-          font-family:'Cinzel',serif;
-          font-size:var(--fs-sm);
-          font-weight:700;
-          letter-spacing:0.1em;
-          padding:clamp(8px,2.5vw,12px) clamp(16px,5vw,28px);
-          background:linear-gradient(160deg,var(--red-hi),var(--red));
-          color:var(--text);
-          border:1.5px solid var(--red-hi);
-          border-radius:8px;
-          cursor:pointer;
-          animation:direct-pulse 1.2s ease-in-out infinite;
-        ">⚔️ Direct Attack</button>
+      <!-- Final strike target: shown on your turn once all enemy walls are gone.
+           The opponent's portrait becomes the target (drag or tap). Keeps the old id
+           so the existing drop/tap wiring still applies. -->
+      <div id="direct-attack-banner" class="final-target hidden" onclick="handleDirectAttack()">
+        <div class="final-ring"><div class="avatar-portrait xl" id="final-opp-avatar"></div></div>
+        <div class="final-label">Drag a weapon here!</div>
       </div>
     </div>
 
@@ -282,7 +271,7 @@
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
 // Version: bump this AND "version" in package.json together.
-const CLIENT_VERSION = '1.4.4';
+const CLIENT_VERSION = '1.5.0';
 const socket = io();
 let myPlayerId = null;
 let myDifficulty = 1;
@@ -525,10 +514,19 @@ async function fxBlocked(wallEl, fx, fromTop) {
   proj.el.remove();
 }
 
+// Remember the weapon used on a final strike, so a wrong answer can bounce it off the face
+let lastDirect = null;
+function emitDirectAttack(card) {
+  lastDirect = { cardSub: card.sub, cardIcon: card.icon };
+  socket.emit('play_attack', { cardId: card.id, targetWallIndex: -1 });
+}
+
 async function fxDirect(fx, mine) {
+  lastDirect = null;
   const banner = document.getElementById('direct-attack-banner');
-  const target = mine && banner && !banner.classList.contains('hidden')
-    ? centerOf(banner) : { x: window.innerWidth / 2, y: window.innerHeight * 0.4 };
+  const face = document.getElementById('final-opp-avatar');
+  const showingFace = mine && banner && !banner.classList.contains('hidden');
+  const target = showingFace ? centerOf(face) : { x: window.innerWidth / 2, y: window.innerHeight * 0.4 };
   const proj = makeProjectile(fx.cardIcon, !mine, IMG[fx.cardSub]);
   await flyProjectile(proj, target.x, target.y);
   proj.el.remove();
@@ -537,7 +535,23 @@ async function fxDirect(fx, mine) {
   screenFlash(mine ? 'rgba(232,200,78,0.55)' : 'rgba(176,30,44,0.6)', 600);
   screenShake(18, 700);
   burst(target.x, target.y, { count: 40, dist: [80, 280], dur: 1000 });
-  await wait(700);
+  if (showingFace) {
+    // Knockout: the portrait gets smacked, spins and drops away
+    banner.classList.remove('aim');
+    banner.querySelector('.final-label').style.visibility = 'hidden';
+    await anim(face, [
+      { transform: 'scale(1) rotate(0)', filter: 'brightness(1)' },
+      { transform: 'scale(1.18) rotate(-8deg)', filter: 'brightness(2.2)', offset: 0.18 },
+      { transform: 'scale(1.05) rotate(10deg)', filter: 'brightness(1.2)', offset: 0.3 },
+      { transform: 'translateY(30px) scale(0.85) rotate(240deg)', opacity: 1, offset: 0.6 },
+      { transform: 'translateY(55vh) scale(0.3) rotate(720deg)', opacity: 0, filter: 'grayscale(1)' },
+    ], { duration: REDUCED_MOTION ? 300 : 1300, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'forwards' });
+    anim(banner.querySelector('.final-ring'), [{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' });
+    SFX.play('wallBreak', 0.6);
+    await wait(250);
+  } else {
+    await wait(700);
+  }
 }
 
 // Correct / wrong on the big math card
@@ -622,6 +636,11 @@ async function playFx({ actor, fx }) {
   const mine = actor === myPlayerId;
   moodFromFx(fx, mine);
   if (mine && awaiting) await fxAnswerResult(fx);
+  if (mine && lastDirect && fx.kind === 'wrong') {
+    const face = document.getElementById('final-opp-avatar');
+    if (face && face.offsetParent) { await wait(80); await fxBlocked(face, lastDirect, false); }
+  }
+  if (mine && fx.kind !== 'direct') lastDirect = null;
 
   if (fx.kind === 'smash' || fx.kind === 'blocked') {
     await wait(80);
@@ -654,7 +673,7 @@ const MOOD_LIST = ['normal', 'attack', 'correct', 'wrong', 'worried', 'shopping'
 // Avatars listed here use animated WebPs from /img/anim/ instead of the still PNGs.
 // (WebPs are converted from the GIFs: same look, about 1/3 the size.)
 // Remove an id from this list to switch that avatar back to stills.
-const ANIMATED_AVATARS = ['avatar1', 'avatar4'];
+const ANIMATED_AVATARS = ['avatar1', 'avatar2', 'avatar3', 'avatar4'];
 let animFailed = false;   // set if this iPad can't show animated WebP → stills from then on
 const avatarSrc = (id, mood = 'normal') => (ANIMATED_AVATARS.includes(id) && !animFailed)
   ? `/img/anim/${id}_${mood}.webp`
@@ -728,7 +747,7 @@ let oppAvatar = null, oppMood = 'normal';
 function showOppMood(mood) {
   if (!MOOD_LIST.includes(mood)) return;
   oppMood = mood;
-  ['game-opp-avatar', 'wait-enemy-avatar'].forEach(id =>
+  ['game-opp-avatar', 'wait-enemy-avatar', 'final-opp-avatar'].forEach(id =>
     setPortrait(document.getElementById(id), oppAvatar || 'avatar1', mood, true));
 }
 
@@ -1506,9 +1525,10 @@ function renderGame(state) {
   turnBadge.textContent = isMyTurn ? 'Your Turn' : `${opp.name}'s Turn`;
   turnBadge.className = `turn-badge${isMyTurn ? ' my-turn' : ''}`;
   document.getElementById('round-label').textContent = `Round ${state.round}`;
-  document.getElementById('enemy-name-label').textContent = `${opp.name}'s Walls`;
+  document.getElementById('enemy-name-label').textContent =
+    opp.walls.every(w => !w.active) ? `${opp.name} has no walls left!` : `${opp.name}'s Walls`;
   if (opp.avatar && opp.avatar !== oppAvatar) { oppAvatar = opp.avatar; preloadAvatar(oppAvatar); }
-  ['game-opp-avatar', 'wait-enemy-avatar'].forEach(id => setPortrait(document.getElementById(id), oppAvatar || 'avatar1', oppMood, false));
+  ['game-opp-avatar', 'wait-enemy-avatar', 'final-opp-avatar'].forEach(id => setPortrait(document.getElementById(id), oppAvatar || 'avatar1', oppMood, false));
   if (!moodTimer && !moodHeld) emitMood(restMood());
 
   // Walls & hand
@@ -1519,7 +1539,18 @@ function renderGame(state) {
   // Direct attack banner — show when all enemy walls gone and it's my turn
   const enemyWipedOut = opp.walls.every(w => !w.active);
   const banner = document.getElementById('direct-attack-banner');
-  banner.classList.toggle('hidden', !(isMyTurn && enemyWipedOut));
+  const finalStand = isMyTurn && enemyWipedOut;
+  const wasFinal = !banner.classList.contains('hidden');
+  banner.classList.toggle('hidden', !finalStand);
+  document.querySelector('.enemy-zone').classList.toggle('final-stand', finalStand);
+  if (finalStand && !wasFinal) {
+    // Portrait grows into the spot where the walls were
+    anim(banner.querySelector('.final-ring'), [
+      { transform: 'scale(0.35)', opacity: 0 },
+      { transform: 'scale(1.12)', opacity: 1, offset: 0.65 },
+      { transform: 'scale(1)', opacity: 1 },
+    ], { duration: 650, easing: 'cubic-bezier(.3,1.4,.5,1)' });
+  }
 
   // Active buffs (Red Potion / Red Spell Book) — badges in the HUD + glowing cards
   const eff = state.activeEffects?.[myPlayerId] || {};
@@ -1683,7 +1714,9 @@ function handleAttackCard(card) {
   selectedAttackCard = card;
   holdMood('attack');
   if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
-  toast('Tap an enemy wall, or drag the card onto it', 'info');
+  const finalT = document.getElementById('direct-attack-banner');
+  if (!finalT.classList.contains('hidden')) { finalT.classList.add('aim'); toast('Tap their face, or drag the card onto it!', 'info'); }
+  else toast('Tap an enemy wall, or drag the card onto it', 'info');
   highlightEnemyWalls();
 }
 
@@ -1703,8 +1736,8 @@ function handleDirectAttack() {
     toast('Select an attack card from your hand first!', 'info');
     return;
   }
-  hitTarget(document.querySelector('#direct-attack-banner button'));
-  socket.emit('play_attack', { cardId: selectedAttackCard.id, targetWallIndex: -1 });
+  hitTarget(document.getElementById('final-opp-avatar'));
+  emitDirectAttack(selectedAttackCard);
   selectedAttackCard = null;
 }
 
@@ -1751,6 +1784,7 @@ function highlightEnemyWalls() {
   });
 }
 function clearWallHighlights() {
+  document.getElementById('direct-attack-banner')?.classList.remove('aim');
   document.querySelectorAll('#enemy-walls .wall-card').forEach(w => {
     w.style.boxShadow = '';
     w.style.border    = '';
@@ -1852,17 +1886,17 @@ function setupDropOnDirectBanner() {
     if (!draggedCard || draggedCard.type !== 'attack') return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    banner.style.outline = '2px solid var(--red-hi)';
+    banner.classList.add('aim');
   });
 
-  banner.addEventListener('dragleave', () => banner.style.outline = '');
+  banner.addEventListener('dragleave', () => banner.classList.remove('aim'));
 
   banner.addEventListener('drop', e => {
     e.preventDefault();
-    banner.style.outline = '';
+    banner.classList.remove('aim');
     if (!draggedCard || draggedCard.type !== 'attack') return;
-    hitTarget(banner.querySelector('button'));
-    socket.emit('play_attack', { cardId: draggedCard.id, targetWallIndex: -1 });
+    hitTarget(document.getElementById('final-opp-avatar'));
+    emitDirectAttack(draggedCard);
     draggedCard = null;
     selectedAttackCard = null;
   });
@@ -1879,8 +1913,7 @@ function setupTouchDrag(el, card) {
   const clearHover = () => {
     document.querySelectorAll('.drag-over, .drag-over-build')
       .forEach(x => x.classList.remove('drag-over', 'drag-over-build'));
-    const b = document.getElementById('direct-attack-banner');
-    if (b) b.style.outline = '';
+    document.getElementById('direct-attack-banner')?.classList.remove('aim');
   };
   const finish = () => {
     dragging = false;
@@ -1949,7 +1982,7 @@ function setupTouchDrag(el, card) {
     if (isAtk) {
       underEl?.closest('[data-wall-index]')?.classList.add('drag-over');
       const bannerEl = underEl?.closest('#direct-attack-banner');
-      if (bannerEl) bannerEl.style.outline = '2px solid var(--red-hi)';
+      if (bannerEl && !bannerEl.classList.contains('hidden')) bannerEl.classList.add('aim');
     } else {
       underEl?.closest('[data-own-wall-index]')?.classList.add('drag-over-build');
     }
@@ -1970,8 +2003,9 @@ function setupTouchDrag(el, card) {
       }
       const bannerEl = underEl?.closest('#direct-attack-banner');
       if (bannerEl && !bannerEl.classList.contains('hidden')) {
-        hitTarget(bannerEl.querySelector('button')); slamInto(bannerEl);
-        socket.emit('play_attack', { cardId: card.id, targetWallIndex: -1 });
+        const face = document.getElementById('final-opp-avatar');
+        hitTarget(face); slamInto(face);
+        emitDirectAttack(card);
         selectedAttackCard = null; finish(); return;
       }
     } else {
@@ -2227,6 +2261,11 @@ function resetForNewGame() {
   document.getElementById('s-gameover').classList.remove('lose');
   document.querySelector('#s-gameover .gameover-panel').classList.remove('win', 'lose');
   document.getElementById('action-log').innerHTML = '&nbsp;';
+  const face = document.getElementById('final-opp-avatar');
+  cancelAnims(face);
+  cancelAnims(document.querySelector('#direct-attack-banner .final-ring'));
+  document.querySelector('#direct-attack-banner .final-label').style.visibility = '';
+  lastDirect = null;
 }
 
 // ─── Number pad (no iPad keyboard) ───────────────────────────────────────────
