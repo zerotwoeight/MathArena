@@ -187,34 +187,34 @@ io.on('connection', (socket) => {
   });
 
   // ── play_attack ──────────────────────────────────────────────────────────────
-  socket.on('play_attack', ({ cardId, targetWallIndex }) => {
+  socket.on('play_attack', ({ cardId, targetShieldIndex }) => {
     const room = rooms.get(socket.roomCode);
     if (!room?.state) return;
-    const result = room.state.playAttack(socket.playerId, cardId, targetWallIndex);
+    const result = room.state.playAttack(socket.playerId, cardId, targetShieldIndex);
     handleActionResult(socket, room, result);
   });
 
   // ── solve_attack ─────────────────────────────────────────────────────────────
-  socket.on('solve_attack', ({ cardId, targetWallIndex, answer }) => {
+  socket.on('solve_attack', ({ cardId, targetShieldIndex, answer }) => {
     const room = rooms.get(socket.roomCode);
     if (!room?.state) return;
-    const result = room.state.solveAttack(socket.playerId, cardId, targetWallIndex, Number(answer));
+    const result = room.state.solveAttack(socket.playerId, cardId, targetShieldIndex, Number(answer));
     handleActionResult(socket, room, result);
   });
 
   // ── play_build ───────────────────────────────────────────────────────────────
-  socket.on('play_build', ({ cardId, wallSlotIndex }) => {
+  socket.on('play_build', ({ cardId, shieldSlotIndex }) => {
     const room = rooms.get(socket.roomCode);
     if (!room?.state) return;
-    const result = room.state.playBuild(socket.playerId, cardId, wallSlotIndex);
+    const result = room.state.playBuild(socket.playerId, cardId, shieldSlotIndex);
     handleActionResult(socket, room, result);
   });
 
   // ── solve_build ──────────────────────────────────────────────────────────────
-  socket.on('solve_build', ({ cardId, wallSlotIndex, answer }) => {
+  socket.on('solve_build', ({ cardId, shieldSlotIndex, answer }) => {
     const room = rooms.get(socket.roomCode);
     if (!room?.state) return;
-    const result = room.state.solveBuild(socket.playerId, cardId, wallSlotIndex, Number(answer));
+    const result = room.state.solveBuild(socket.playerId, cardId, shieldSlotIndex, Number(answer));
     handleActionResult(socket, room, result);
   });
 

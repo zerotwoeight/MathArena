@@ -58,13 +58,13 @@ const BLD_SUBS = [
 ];
 
 const WILD_DEFS = [
-  { effect: 'red_potion',  name: 'Red Potion',    icon: '🧪', desc: 'Next attack destroys target wall + one adjacent wall.' },
+  { effect: 'red_potion',  name: 'Red Potion',    icon: '🧪', desc: 'Next attack destroys target shield + one adjacent shield.' },
   { effect: 'wooden_chest',name: 'Wooden Chest',  icon: '📦', desc: 'Free attack card added to hand.' },
   { effect: 'iron_chest',  name: 'Iron Chest',    icon: '🗃️', desc: 'Extra action + 1 free card added to hand.' },
-  { effect: 'purple_potion',name: 'Purple Potion',icon: '🟣', desc: 'Lose 1 random wall if wrong; safe if correct.' },
+  { effect: 'purple_potion',name: 'Purple Potion',icon: '🟣', desc: 'Lose 1 random shield if wrong; safe if correct.' },
   { effect: 'gold_chest',  name: 'Gold Chest',    icon: '🏆', desc: 'Free attack card + free build card added to hand.' },
   { effect: 'red_spellbook',name: 'Red Spell Book',icon: '📕',desc: 'Your next action needs no math!' },
-  { effect: 'poison_drink',name: 'Poison Drink',  icon: '☠️', desc: 'Lose 1 random wall; wrong solve = lose 2 walls.' },
+  { effect: 'poison_drink',name: 'Poison Drink',  icon: '☠️', desc: 'Lose 1 random shield; wrong solve = lose 2 shields.' },
   { effect: 'armory',      name: 'Armory',        icon: '🛡️', desc: 'Free build card added to hand.' },
   { effect: 'looking_glass',name: 'Looking Glass',icon: '🔮', desc: 'Steal 2 random cards from opponent\'s hand.' },
 ];
@@ -111,8 +111,8 @@ function drawStartingHand(attackPile, difficulty) {
   return cards;
 }
 
-// ─── Starting walls ───────────────────────────────────────────────────────────
-function buildStartingWalls() {
+// ─── Starting shields ───────────────────────────────────────────────────────────
+function buildStartingShields() {
   return [
     { type: 'Stone', icon: '🪨', active: true },
     { type: 'Wood',  icon: '🌲', active: true },
@@ -132,7 +132,7 @@ module.exports = {
   buildBuildPile,
   buildWildPile,
   drawStartingHand,
-  buildStartingWalls,
+  buildStartingShields,
   MATCHUP,
   WILD_DEFS,
   makeEq,

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>⚔ Math Card Game</title>
+  <title>Math-Arena</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
 <div id="s-landing" class="screen active">
   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(18px,5.5vw,28px);padding:clamp(16px,5vw,28px);">
     <div>
-      <div class="logo">⚔ MATH CARD GAME ⚔</div>
+      <img class="logo-img" src="/img/Logo.png" alt="Math-Arena">
       <div class="logo-sub">Multiply · Conquer · Survive</div>
     </div>
     <div class="lobby-panel">
@@ -42,6 +42,7 @@
 <!-- ═══════════════════════════════════════════════════════ SCREEN: HOST SETUP -->
 <div id="s-host-setup" class="screen">
   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(16px,5vw,24px);padding:clamp(16px,5vw,28px);">
+    <img class="logo-img logo-img-sm" src="/img/Logo.png" alt="Math-Arena">
     <div class="logo" style="font-size:var(--fs-xl);">⚔ Create Game</div>
     <div class="lobby-panel">
       <input id="host-name" class="text-input" type="text" placeholder="Your name" maxlength="16" autocomplete="off">
@@ -64,6 +65,7 @@
 <!-- ═══════════════════════════════════════════════════════ SCREEN 2: HOST WAIT -->
 <div id="s-host-wait" class="screen">
   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(14px,4.5vw,22px);padding:clamp(16px,5vw,28px);">
+    <img class="logo-img logo-img-sm" src="/img/Logo.png" alt="Math-Arena">
     <div class="logo" style="font-size:var(--fs-xl);">Waiting for Player 2…</div>
     <div class="lobby-panel" style="align-items:center;gap:clamp(14px,4.5vw,20px);">
       <div class="vs-row" id="host-vs"></div>
@@ -91,6 +93,7 @@
 <!-- ═══════════════════════════════════════════════════════ SCREEN 3: CLIENT JOIN -->
 <div id="s-client-join" class="screen">
   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(16px,5vw,24px);padding:clamp(16px,5vw,28px);">
+    <img class="logo-img logo-img-sm" src="/img/Logo.png" alt="Math-Arena">
     <div class="logo" style="font-size:var(--fs-xl);">⚔ Join Game</div>
     <div class="lobby-panel">
       <input id="client-name" class="text-input" type="text" placeholder="Your name" maxlength="16" autocomplete="off">
@@ -116,6 +119,7 @@
 <!-- ═══════════════════════════════════════════════════════ SCREEN 4: CLIENT WAIT -->
 <div id="s-client-wait" class="screen">
   <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:clamp(14px,4.5vw,22px);padding:clamp(16px,5vw,28px);">
+    <img class="logo-img logo-img-sm" src="/img/Logo.png" alt="Math-Arena">
     <div class="logo" style="font-size:var(--fs-xl);">Connected!</div>
     <div class="lobby-panel" style="align-items:center;text-align:center;gap:clamp(12px,3.5vw,18px);">
       <div class="text-dim" style="font-size:var(--fs-sm);">Waiting for host to start…</div>
@@ -153,10 +157,10 @@
     <div class="enemy-zone">
       <div class="zone-head">
         <div class="avatar-portrait sm" id="game-opp-avatar"></div>
-        <div class="zone-label" id="enemy-name-label">Enemy Walls</div>
+        <div class="zone-label" id="enemy-name-label">Enemy Shields</div>
       </div>
-      <div class="wall-row" id="enemy-walls"></div>
-      <!-- Final strike target: shown on your turn once all enemy walls are gone.
+      <div class="shield-row" id="enemy-shields"></div>
+      <!-- Final strike target: shown on your turn once all enemy shields are gone.
            The opponent's portrait becomes the target (drag or tap). Keeps the old id
            so the existing drop/tap wiring still applies. -->
       <div id="direct-attack-banner" class="final-target hidden" onclick="handleDirectAttack()">
@@ -176,10 +180,10 @@
       </div>
     </div>
 
-    <!-- Own walls -->
+    <!-- Own shields -->
     <div class="own-zone">
-      <div class="zone-label" id="own-name-label">Your Walls</div>
-      <div class="wall-row" id="own-walls"></div>
+      <div class="zone-label" id="own-name-label">Your Shields</div>
+      <div class="shield-row" id="own-shields"></div>
     </div>
 
   </div>
@@ -246,9 +250,13 @@
         Their Turn
       </div>
     </div>
-    <div class="wait-walls-section">
-      <div class="wait-walls-label">Your Walls</div>
-      <div class="wall-row" id="wait-own-walls"></div>
+    <div class="wait-shields-section">
+      <div class="wait-shields-label">Your Shields</div>
+      <div class="shield-row" id="wait-own-shields"></div>
+    </div>
+    <div class="wait-me-section">
+      <div class="avatar-portrait md" id="wait-my-avatar"></div>
+      <div class="wait-me-name" id="wait-my-name"></div>
     </div>
   </div>
 </div>
@@ -271,7 +279,7 @@
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
 // Version: bump this AND "version" in package.json together.
-const CLIENT_VERSION = '1.5.0';
+const CLIENT_VERSION = '1.6.1';
 const socket = io();
 let myPlayerId = null;
 let myDifficulty = 1;
@@ -286,7 +294,7 @@ let timerSeconds = 0;
 const SFX = (() => {
   const files = {
     select: 'cardSelect', submit: 'Submit', positive: 'Positive', negative: 'Negitive',
-    sword: 'Hit-Sword', gun: 'Hit-Gun', hammer: 'Hit-Hammer', wallBreak: 'WallBreak',
+    sword: 'Hit-Sword', gun: 'Hit-Gun', hammer: 'Hit-Hammer', shieldBreak: 'ShieldBreak',
   };
   const AC = window.AudioContext || window.webkitAudioContext;
   const ctx = AC ? new AC() : null;
@@ -418,16 +426,16 @@ function screenFlash(color = 'rgba(255,255,255,0.5)', dur = 350) {
   anim(f, [{ opacity: 1 }, { opacity: 0 }], { duration: dur, easing: 'ease-out' }).then(() => f.remove());
 }
 
-const WALL_COLORS = {
+const SHIELD_COLORS = {
   Stone: ['#8a8f99', '#5c616b', '#b8bcc4', '#3e434c'],
   Wood:  ['#8b5a2b', '#5e3a17', '#c08a50', '#3f2710'],
   Gem:   ['#4f7bff', '#9bb6ff', '#1c38b0', '#e0e8ff'],
 };
-function wallTypeOf(wallEl) {
-  return wallEl?.dataset?.wallType || 'Stone';
+function shieldTypeOf(shieldEl) {
+  return shieldEl?.dataset?.shieldType || 'Stone';
 }
 function shards(x, y, type) {
-  burst(x, y, { count: 22, colors: WALL_COLORS[type] || WALL_COLORS.Stone, size: [6, 16], dist: [50, 190], dur: 900, square: true, gravity: 90 });
+  burst(x, y, { count: 22, colors: SHIELD_COLORS[type] || SHIELD_COLORS.Stone, size: [6, 16], dist: [50, 190], dur: 900, square: true, gravity: 90 });
 }
 
 // A card icon flung at a point (from the hand, or from the top for the opponent's attacks)
@@ -457,49 +465,49 @@ async function flyProjectile(proj, tx, ty) {
 // ═══════════════════════════════════════════════════════════════════════════
 //  GAME FX SEQUENCES
 // ═══════════════════════════════════════════════════════════════════════════
-// Walls we've already animated ourselves — renderWalls skips its own flash for these.
+// Shields we've already animated ourselves — renderShields skips its own flash for these.
 const suppressFlash = new Set();
 
-async function breakWall(wallEl, containerId, idx) {
+async function breakShield(shieldEl, containerId, idx) {
   suppressFlash.add(`${containerId}:${idx}`);
-  const { x, y } = centerOf(wallEl);
-  shards(x, y, wallTypeOf(wallEl));
-  await anim(wallEl, [
+  const { x, y } = centerOf(shieldEl);
+  shards(x, y, shieldTypeOf(shieldEl));
+  await anim(shieldEl, [
     { transform: 'scale(1.15) rotate(-4deg)', filter: 'brightness(2.4)', opacity: 1 },
     { transform: 'scale(0.55) rotate(10deg) translateY(20px)', filter: 'brightness(0.6) grayscale(1)', opacity: 0 },
   ], { duration: 380, easing: 'ease-in', fill: 'forwards' });
 }
 
-async function fxSmash(wallEl, fx, containerId, fromTop) {
-  const { x, y } = centerOf(wallEl);
+async function fxSmash(shieldEl, fx, containerId, fromTop) {
+  const { x, y } = centerOf(shieldEl);
   const proj = makeProjectile(fx.cardIcon, fromTop, IMG[fx.cardSub]);
   await flyProjectile(proj, x, y);
   proj.el.remove();
   SFX.play(WEAPON_SFX[fx.cardSub] || 'sword');
   burst(x, y, { count: 10, colors: ['#fff', '#ffe08a'], dist: [30, 80], dur: 350 });
-  await anim(wallEl, [
+  await anim(shieldEl, [
     { transform: 'scale(1)', filter: 'brightness(1)' },
     { transform: 'scale(1.18) rotate(-5deg)', filter: 'brightness(2.6)' },
     { transform: 'scale(0.95) rotate(4deg)', filter: 'brightness(1.5)' },
   ], { duration: 200, fill: 'forwards' });
-  SFX.play('wallBreak', 0.9);
+  SFX.play('shieldBreak', 0.9);
   screenShake(10, 450);
-  const jobs = [breakWall(wallEl, containerId, fx.target)];
+  const jobs = [breakShield(shieldEl, containerId, fx.target)];
   if (fx.also >= 0) {
-    const second = document.querySelectorAll(`#${containerId} .wall-card`)[fx.also];
-    if (second) jobs.push(wait(160).then(() => breakWall(second, containerId, fx.also)));
+    const second = document.querySelectorAll(`#${containerId} .shield-card`)[fx.also];
+    if (second) jobs.push(wait(160).then(() => breakShield(second, containerId, fx.also)));
   }
   await Promise.all(jobs);
 }
 
-async function fxBlocked(wallEl, fx, fromTop) {
-  const { x, y } = centerOf(wallEl);
+async function fxBlocked(shieldEl, fx, fromTop) {
+  const { x, y } = centerOf(shieldEl);
   const proj = makeProjectile(fx.cardIcon, fromTop, IMG[fx.cardSub]);
   const { dx, dy } = await flyProjectile(proj, x, y);
   SFX.play(WEAPON_SFX[fx.cardSub] || 'sword');
   burst(x, y, { count: 8, colors: ['#cfd6e0', '#ffffff'], dist: [20, 60], dur: 300 });
-  // Wall holds firm — a stubborn little shudder + steel glint
-  anim(wallEl, [
+  // Shield holds firm — a stubborn little shudder + steel glint
+  anim(shieldEl, [
     { transform: 'translateX(0)', filter: 'brightness(1)' },
     { transform: 'translateX(-6px)', filter: 'brightness(1.8) saturate(0)' },
     { transform: 'translateX(5px)' }, { transform: 'translateX(-3px)' },
@@ -518,7 +526,7 @@ async function fxBlocked(wallEl, fx, fromTop) {
 let lastDirect = null;
 function emitDirectAttack(card) {
   lastDirect = { cardSub: card.sub, cardIcon: card.icon };
-  socket.emit('play_attack', { cardId: card.id, targetWallIndex: -1 });
+  socket.emit('play_attack', { cardId: card.id, targetShieldIndex: -1 });
 }
 
 async function fxDirect(fx, mine) {
@@ -531,7 +539,7 @@ async function fxDirect(fx, mine) {
   await flyProjectile(proj, target.x, target.y);
   proj.el.remove();
   SFX.play(WEAPON_SFX[fx.cardSub] || 'sword');
-  SFX.play('wallBreak');
+  SFX.play('shieldBreak');
   screenFlash(mine ? 'rgba(232,200,78,0.55)' : 'rgba(176,30,44,0.6)', 600);
   screenShake(18, 700);
   burst(target.x, target.y, { count: 40, dist: [80, 280], dur: 1000 });
@@ -547,7 +555,7 @@ async function fxDirect(fx, mine) {
       { transform: 'translateY(55vh) scale(0.3) rotate(720deg)', opacity: 0, filter: 'grayscale(1)' },
     ], { duration: REDUCED_MOTION ? 300 : 1300, easing: 'cubic-bezier(.4,0,.8,.6)', fill: 'forwards' });
     anim(banner.querySelector('.final-ring'), [{ opacity: 1 }, { opacity: 0 }], { duration: 250, fill: 'forwards' });
-    SFX.play('wallBreak', 0.6);
+    SFX.play('shieldBreak', 0.6);
     await wait(250);
   } else {
     await wait(700);
@@ -645,12 +653,12 @@ async function playFx({ actor, fx }) {
   if (fx.kind === 'smash' || fx.kind === 'blocked') {
     await wait(80);
     const containerId = mine
-      ? 'enemy-walls'
-      : (document.getElementById('s-waiting').classList.contains('active') ? 'wait-own-walls' : 'own-walls');
-    const wallEl = document.querySelectorAll(`#${containerId} .wall-card`)[fx.target];
-    if (!wallEl) return;
-    if (fx.kind === 'smash') await fxSmash(wallEl, fx, containerId, !mine);
-    else await fxBlocked(wallEl, fx, !mine);
+      ? 'enemy-shields'
+      : (document.getElementById('s-waiting').classList.contains('active') ? 'wait-own-shields' : 'own-shields');
+    const shieldEl = document.querySelectorAll(`#${containerId} .shield-card`)[fx.target];
+    if (!shieldEl) return;
+    if (fx.kind === 'smash') await fxSmash(shieldEl, fx, containerId, !mine);
+    else await fxBlocked(shieldEl, fx, !mine);
   } else if (fx.kind === 'direct') {
     await fxDirect(fx, mine);
   } else if (fx.kind === 'wild' || (fx.kind === 'wrong' && fx.effect)) {
@@ -755,12 +763,13 @@ function showOppMood(mood) {
 let myMoodNow = 'normal', moodTimer = null, moodHeld = false;
 function restMood() {
   const me = gameState?.players?.[myPlayerId];
-  const standing = me ? me.walls.filter(w => w.active).length : 3;
+  const standing = me ? me.shields.filter(w => w.active).length : 3;
   return standing <= 1 ? 'worried' : 'normal';
 }
 function emitMood(m) {
   if (m === myMoodNow || !myPlayerId) return;
   myMoodNow = m;
+  setPortrait(document.getElementById('wait-my-avatar'), myAvatar || 'avatar1', m, true);
   socket.emit('set_mood', { mood: m });
 }
 function setMyMood(m, hold = 2200) {            // show a mood briefly, then rest
@@ -780,10 +789,10 @@ function moodFromFx(fx, mine) {
   if (mine) {
     if (fx.kind === 'wrong' || fx.kind === 'blocked') setMyMood('wrong');
     else if (fx.kind === 'smash' || fx.kind === 'direct') setMyMood('attack');
-    else if (fx.lostWalls?.length) setMyMood('worried', 2600);
+    else if (fx.lostShields?.length) setMyMood('worried', 2600);
     else if (['correct', 'built', 'wild'].includes(fx.kind)) setMyMood('correct');
   } else if (fx.kind === 'smash' || fx.kind === 'direct' || (fx.kind === 'wild' && fx.stolen)) {
-    setMyMood('worried', 2600);                 // they hit my wall or stole my cards
+    setMyMood('worried', 2600);                 // they hit my shield or stole my cards
   }
 }
 
@@ -792,42 +801,43 @@ function moodFromFx(fx, mine) {
 // ═══════════════════════════════════════════════════════════════════════════
 const IMG = {
   Sword: '/img/Attack-Sword.png', Gun: '/img/Attack-Gun.png', Hammer: '/img/Attack-Hammer.png',
-  Stone: '/img/Wall-Stone.png', Wood: '/img/Wall-Wood.png', Gem: '/img/Wall-Gem.png',
+  Stone: '/img/Shield-Stone.png', Wood: '/img/Shield-Wood.png', Gem: '/img/Shield-Gem.png',
   red_potion: '/img/Wild-RedPotion.png', wooden_chest: '/img/Wild-WoodenChest.png',
   iron_chest: '/img/Wild-IronChest.png', purple_potion: '/img/Wild-PurplePotion.png',
   gold_chest: '/img/Wild-GoldChest.png', red_spellbook: '/img/Wild-RedBook.png',
   poison_drink: '/img/Wild-PoisonDrink.png', armory: '/img/Wild-Armory.png',
   looking_glass: '/img/Wild-LookingGlass.png',
 };
-const WALL_HINT = {
+const SHIELD_HINT = {
   Stone: 'Strong against Swords',
   Gem:   'Strong against Guns',
   Wood:  'Strong against Hammers',
 };
 // Preload everything so cards never pop in blank
-['/img/CardFront-Border.png', '/img/CardBack-Border.png', ...Object.values(IMG)]
+['Attack', 'Build', 'Wild'].flatMap(t => [`/img/CardFront-${t}.png`, `/img/CardBack-${t}.png`])
+  .concat(Object.values(IMG), ['/img/Logo.png'])
   .forEach(src => { const i = new Image(); i.src = src; });
 
 const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /**
  * Builds the layered inside of a card.
- *  kind: 'atk' | 'bld' | 'wall' | 'wld' | 'back'
+ *  kind: 'atk' | 'bld' | 'shield' | 'wld' | 'back'
  *  opts: { art, eq, name, hint, dead, tone }  (tone = 'atk'|'bld'|'wld' for backs)
  */
 function cardFace(kind, { art, eq, name, hint, dead, tone } = {}) {
   if (kind === 'back') {
     return `<div class="ac-bg ac-bg-${tone || 'wld'}"></div>
       <div class="ac-q">?</div>
-      <div class="ac-frame ac-frame-back"></div>
+      <div class="ac-frame ac-frame-back ac-frame-back-${tone || 'wld'}"></div>
       <div class="ac-content">${eq ? `<div class="ac-plate">${esc(eq)}</div>` : ''}${name ? `<div class="ac-name">${esc(name)}</div>` : ''}</div>`;
   }
-  const textured = kind === 'bld' || kind === 'wall';
-  const bg = textured
-    ? `<div class="ac-bg ac-tex${dead ? ' ac-dead' : ''}${kind === 'bld' ? ' ac-dim' : ''}" style="background-image:url('${art}')"></div>`
-    : `<div class="ac-bg ac-bg-${kind}"></div><div class="ac-art" style="background-image:url('${art}')"></div>`;
+  // Every kind now uses the same layout: coloured background + art on top.
+  // Shields sit on gold-brown, build cards (shields in hand) stay green.
+  const bg = `<div class="ac-bg ac-bg-${kind}${dead ? ' ac-dead' : ''}"></div>`
+    + `<div class="ac-art${kind === 'shield' ? ' ac-art-shield' : ''}${dead ? ' ac-dead' : ''}" style="background-image:url('${art}')"></div>`;
   return `${bg}
-    <div class="ac-frame${dead ? ' ac-dead' : ''}"></div>
+    <div class="ac-frame ac-frame-${kind}${dead ? ' ac-dead' : ''}"></div>
     <div class="ac-content ac-${kind}">
       ${eq ? `<div class="ac-plate">${esc(eq)}</div>` : ''}
       ${name ? `<div class="ac-name">${esc(name)}</div>` : ''}
@@ -838,13 +848,13 @@ function cardFace(kind, { art, eq, name, hint, dead, tone } = {}) {
 // Convenience builders
 function faceForCard(card) {
   if (card.type === 'attack') return cardFace('atk', { art: IMG[card.sub], eq: card.eq, name: card.sub });
-  if (card.type === 'build')  return cardFace('bld', { art: IMG[card.sub], eq: card.eq, name: card.sub, hint: WALL_HINT[card.sub] });
+  if (card.type === 'build')  return cardFace('bld', { art: IMG[card.sub], eq: card.eq, name: card.sub, hint: SHIELD_HINT[card.sub] });
   return cardFace('wld', { art: IMG[card.effect], eq: card.resolveEq, name: card.name });
 }
-function faceForWall(wall) {
-  return cardFace('wall', {
-    art: IMG[wall.type], name: wall.type, dead: !wall.active,
-    hint: wall.active ? WALL_HINT[wall.type] : 'Destroyed',
+function faceForShield(shield) {
+  return cardFace('shield', {
+    art: IMG[shield.type], name: shield.type, dead: !shield.active,
+    hint: shield.active ? SHIELD_HINT[shield.type] : 'Destroyed',
   });
 }
 
@@ -903,14 +913,14 @@ async function fxWild(fx, mine, actor) {
 
   if (fx.effect === 'poison_drink' || (fx.effect === 'purple_potion' && !fx.safe)) {
     SFX.play('negative', 0.7);
-    // Toxic haze rolls over your walls; the wall-break plays when the board updates
-    const own = document.getElementById('own-walls');
+    // Toxic haze rolls over your shields; the shield-break plays when the board updates
+    const own = document.getElementById('own-shields');
     if (own && !REDUCED_MOTION) {
       const { x, y } = centerOf(own);
       burst(x, y, { count: 26, colors: ['rgba(110,255,110,0.6)', 'rgba(40,160,40,0.5)', 'rgba(200,255,180,0.5)'], size: [18, 36], dist: [30, 140], dur: 1300, gravity: -60 });
     }
   } else if (fx.effect === 'purple_potion' && fx.safe) {
-    document.querySelectorAll('#own-walls .wall-card:not(.dead)').forEach((w, i) =>
+    document.querySelectorAll('#own-shields .shield-card:not(.dead)').forEach((w, i) =>
       anim(w, [
         { filter: 'brightness(1)', boxShadow: '0 0 0 rgba(120,160,255,0)' },
         { filter: 'brightness(1.6) hue-rotate(20deg)', boxShadow: '0 0 26px rgba(120,160,255,1)', offset: 0.4 },
@@ -935,7 +945,7 @@ async function fxPotionLost() {
   d.className = 'fx-icon-pop';
   d.innerHTML = `<img src="${IMG.red_potion}" alt="">`;
   document.body.appendChild(d);
-  SFX.play('wallBreak', 0.7);
+  SFX.play('shieldBreak', 0.7);
   await anim(d, [
     { transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0, filter: 'drop-shadow(0 0 30px rgba(255,40,60,1))' },
     { transform: 'translate(-50%,-50%) scale(1.2) rotate(-8deg)', opacity: 1, offset: 0.3 },
@@ -1477,15 +1487,15 @@ socket.on('math_challenge', (challenge) => {
   queueFx(() => { pendingChallenge = challenge; showMathChallenge(challenge); });
 });
 
-// ─── Wall flash tracking ─────────────────────────────────────────────────────
+// ─── Shield flash tracking ─────────────────────────────────────────────────────
 // Keyed by containerId → array of { active, type } so we can detect changes
-const _prevWalls = {};
+const _prevShields = {};
 
-// ─── Wall type → CSS class ───────────────────────────────────────────────────
-function wallColorClass(type) {
+// ─── Shield type → CSS class ───────────────────────────────────────────────────
+function shieldColorClass(type) {
   if (type === 'Wood') return 'bld';
   if (type === 'Gem')  return 'wld';
-  return 'wall-stone'; // Stone
+  return 'shield-stone'; // Stone
 }
 
 // ─── Game rendering ──────────────────────────────────────────────────────────
@@ -1526,25 +1536,25 @@ function renderGame(state) {
   turnBadge.className = `turn-badge${isMyTurn ? ' my-turn' : ''}`;
   document.getElementById('round-label').textContent = `Round ${state.round}`;
   document.getElementById('enemy-name-label').textContent =
-    opp.walls.every(w => !w.active) ? `${opp.name} has no walls left!` : `${opp.name}'s Walls`;
+    opp.shields.every(w => !w.active) ? `${opp.name} has no shields left!` : `${opp.name}'s Shields`;
   if (opp.avatar && opp.avatar !== oppAvatar) { oppAvatar = opp.avatar; preloadAvatar(oppAvatar); }
   ['game-opp-avatar', 'wait-enemy-avatar', 'final-opp-avatar'].forEach(id => setPortrait(document.getElementById(id), oppAvatar || 'avatar1', oppMood, false));
   if (!moodTimer && !moodHeld) emitMood(restMood());
 
-  // Walls & hand
-  renderWalls('enemy-walls', opp.walls, isMyTurn, 'enemy');
-  renderWalls('own-walls', me.walls, isMyTurn, 'own');
+  // Shields & hand
+  renderShields('enemy-shields', opp.shields, isMyTurn, 'enemy');
+  renderShields('own-shields', me.shields, isMyTurn, 'own');
   renderHand(me.hand, isMyTurn);
 
-  // Direct attack banner — show when all enemy walls gone and it's my turn
-  const enemyWipedOut = opp.walls.every(w => !w.active);
+  // Direct attack banner — show when all enemy shields gone and it's my turn
+  const enemyWipedOut = opp.shields.every(w => !w.active);
   const banner = document.getElementById('direct-attack-banner');
   const finalStand = isMyTurn && enemyWipedOut;
   const wasFinal = !banner.classList.contains('hidden');
   banner.classList.toggle('hidden', !finalStand);
   document.querySelector('.enemy-zone').classList.toggle('final-stand', finalStand);
   if (finalStand && !wasFinal) {
-    // Portrait grows into the spot where the walls were
+    // Portrait grows into the spot where the shields were
     anim(banner.querySelector('.final-ring'), [
       { transform: 'scale(0.35)', opacity: 0 },
       { transform: 'scale(1.12)', opacity: 1, offset: 0.65 },
@@ -1579,52 +1589,54 @@ function renderGame(state) {
     showScreen('s-game');
   } else {
     document.getElementById('wait-enemy-name').textContent = opp.name;
-    renderWalls('wait-own-walls', me.walls, false, 'wait');
+    renderShields('wait-own-shields', me.shields, false, 'wait');
+    document.getElementById('wait-my-name').textContent = me.name;
+    setPortrait(document.getElementById('wait-my-avatar'), me.avatar || myAvatar || 'avatar1', myMoodNow, false);
     showScreen('s-waiting');
   }
 }
 
-function renderWalls(containerId, walls, interactive, mode) {
+function renderShields(containerId, shields, interactive, mode) {
   const container = document.getElementById(containerId);
-  const sizeVar = (mode === 'wait' || mode === 'own') ? 'var(--own-w)' : 'var(--wall-w)';
-  const prev = _prevWalls[containerId] || [];
+  const sizeVar = (mode === 'wait' || mode === 'own') ? 'var(--own-w)' : 'var(--shield-w)';
+  const prev = _prevShields[containerId] || [];
 
   // Detect changes per slot for flash animations
-  const flashClass = walls.map((wall, idx) => {
+  const flashClass = shields.map((shield, idx) => {
     const p = prev[idx];
     if (!p) return null; // first render, no flash
-    if (p.active && !wall.active) return 'flash-destroy';  // wall destroyed
-    if (!p.active && wall.active) return 'flash-build';    // wall rebuilt
-    if (!p.active && !wall.active && p.type !== wall.type) return 'flash-build'; // type replaced
+    if (p.active && !shield.active) return 'flash-destroy';  // shield destroyed
+    if (!p.active && shield.active) return 'flash-build';    // shield rebuilt
+    if (!p.active && !shield.active && p.type !== shield.type) return 'flash-build'; // type replaced
     return null;
   });
 
   // Save new state
-  _prevWalls[containerId] = walls.map(w => ({ active: w.active, type: w.type }));
+  _prevShields[containerId] = shields.map(w => ({ active: w.active, type: w.type }));
 
   container.innerHTML = '';
 
-  walls.forEach((wall, idx) => {
+  shields.forEach((shield, idx) => {
     const div = document.createElement('div');
-    div.className = `card art-card wall-card${wall.active ? '' : ' dead'}`;
+    div.className = `card art-card shield-card${shield.active ? '' : ' dead'}`;
     div.style.width = sizeVar;
-    div.dataset.wallType = wall.type;
-    div.innerHTML = faceForWall(wall);
+    div.dataset.shieldType = shield.type;
+    div.innerHTML = faceForShield(shield);
 
-    if (!wall.active) {
+    if (!shield.active) {
       if (interactive && mode === 'own') {
-        // Dead own-wall slot = build target
+        // Dead own-shield slot = build target
         div.style.cursor = 'pointer';
-        div.dataset.ownWallIndex = idx;
+        div.dataset.ownShieldIndex = idx;
         div.addEventListener('click', () => selectBuildTarget(idx));
-        setupDropOnOwnWall(div, idx);
+        setupDropOnOwnShield(div, idx);
       }
     } else {
       if (interactive && mode === 'enemy') {
         div.style.cursor = 'pointer';
-        div.dataset.wallIndex = idx;
+        div.dataset.shieldIndex = idx;
         div.addEventListener('click', () => selectAttackTarget(idx));
-        setupDropOnWall(div, idx, true);
+        setupDropOnShield(div, idx, true);
       }
     }
 
@@ -1641,8 +1653,8 @@ function renderWalls(containerId, walls, interactive, mode) {
         if (!r.width) return; // container not on screen
         const x = r.left + r.width / 2, y = r.top + r.height / 2;
         if (cls === 'flash-destroy') {
-          SFX.play('wallBreak', 0.8);
-          shards(x, y, wall.type);
+          SFX.play('shieldBreak', 0.8);
+          shards(x, y, shield.type);
           screenShake(6, 350);
         } else {
           setTimeout(() => burst(x, y + r.height * 0.35, {
@@ -1706,7 +1718,7 @@ function handleAttackCard(card) {
   // Deselect if tapping the same card again
   if (selectedAttackCard?.id === card.id) {
     selectedAttackCard = null;
-    clearWallHighlights();
+    clearShieldHighlights();
     releaseMood();
     if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
     return;
@@ -1716,19 +1728,19 @@ function handleAttackCard(card) {
   if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
   const finalT = document.getElementById('direct-attack-banner');
   if (!finalT.classList.contains('hidden')) { finalT.classList.add('aim'); toast('Tap their face, or drag the card onto it!', 'info'); }
-  else toast('Tap an enemy wall, or drag the card onto it', 'info');
-  highlightEnemyWalls();
+  else toast('Tap an enemy shield, or drag the card onto it', 'info');
+  highlightEnemyShields();
 }
 
-function selectAttackTarget(wallIndex) {
+function selectAttackTarget(shieldIndex) {
   if (!selectedAttackCard) {
     toast('Select an attack card first', 'info');
     return;
   }
-  hitTarget(document.querySelector(`#enemy-walls [data-wall-index="${wallIndex}"]`));
-  socket.emit('play_attack', { cardId: selectedAttackCard.id, targetWallIndex: wallIndex });
+  hitTarget(document.querySelector(`#enemy-shields [data-shield-index="${shieldIndex}"]`));
+  socket.emit('play_attack', { cardId: selectedAttackCard.id, targetShieldIndex: shieldIndex });
   selectedAttackCard = null;
-  clearWallHighlights();
+  clearShieldHighlights();
 }
 
 function handleDirectAttack() {
@@ -1747,22 +1759,22 @@ function handleBuildCard(card) {
   // Deselect if tapping same card again
   if (selectedBuildCard?.id === card.id) {
     selectedBuildCard = null;
-    clearOwnWallHighlights();
+    clearOwnShieldHighlights();
     if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
     return;
   }
   // Check there's actually an empty slot first
   const me = gameState?.players[myPlayerId];
   if (!me) return;
-  const hasEmptySlot = me.walls.some(w => !w.active);
+  const hasEmptySlot = me.shields.some(w => !w.active);
   if (!hasEmptySlot) {
-    toast('All wall slots are occupied!', 'info');
+    toast('All shield slots are occupied!', 'info');
     return;
   }
   selectedBuildCard = card;
   if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
-  toast('Tap an empty wall slot, or drag the card onto it', 'info');
-  highlightOwnWallSlots();
+  toast('Tap an empty shield slot, or drag the card onto it', 'info');
+  highlightOwnShieldSlots();
 }
 
 function selectBuildTarget(slotIndex) {
@@ -1770,35 +1782,35 @@ function selectBuildTarget(slotIndex) {
     toast('Select a build card first', 'info');
     return;
   }
-  hitTarget(document.querySelector(`#own-walls [data-own-wall-index="${slotIndex}"]`));
-  socket.emit('play_build', { cardId: selectedBuildCard.id, wallSlotIndex: slotIndex });
+  hitTarget(document.querySelector(`#own-shields [data-own-shield-index="${slotIndex}"]`));
+  socket.emit('play_build', { cardId: selectedBuildCard.id, shieldSlotIndex: slotIndex });
   selectedBuildCard = null;
-  clearOwnWallHighlights();
+  clearOwnShieldHighlights();
 }
 
 // ── Highlight helpers ─────────────────────────────────────────────────────────
-function highlightEnemyWalls() {
-  document.querySelectorAll('#enemy-walls .wall-card:not(.dead)').forEach(w => {
+function highlightEnemyShields() {
+  document.querySelectorAll('#enemy-shields .shield-card:not(.dead)').forEach(w => {
     w.style.boxShadow = '0 0 14px rgba(176,30,44,0.9)';
     w.style.border    = '2px solid var(--red-hi)';
   });
 }
-function clearWallHighlights() {
+function clearShieldHighlights() {
   document.getElementById('direct-attack-banner')?.classList.remove('aim');
-  document.querySelectorAll('#enemy-walls .wall-card').forEach(w => {
+  document.querySelectorAll('#enemy-shields .shield-card').forEach(w => {
     w.style.boxShadow = '';
     w.style.border    = '';
     w.classList.remove('drag-over');
   });
 }
-function highlightOwnWallSlots() {
-  document.querySelectorAll('#own-walls .wall-card.dead').forEach(w => {
+function highlightOwnShieldSlots() {
+  document.querySelectorAll('#own-shields .shield-card.dead').forEach(w => {
     w.style.boxShadow = '0 0 14px rgba(30,122,52,0.9)';
     w.style.border    = '2px solid var(--green-hi)';
   });
 }
-function clearOwnWallHighlights() {
-  document.querySelectorAll('#own-walls .wall-card').forEach(w => {
+function clearOwnShieldHighlights() {
+  document.querySelectorAll('#own-shields .shield-card').forEach(w => {
     w.style.boxShadow = '';
     w.style.border    = '';
     w.classList.remove('drag-over-build');
@@ -1807,7 +1819,7 @@ function clearOwnWallHighlights() {
 
 // ── HTML5 Drag-and-Drop (desktop + iPad with pointer events) ──────────────────
 // Cards: draggable="true", dragstart stores card data
-// Walls: dragover / drop targets
+// Shields: dragover / drop targets
 
 function setupDragOnCard(el, card, isMyTurn) {
   if (!isMyTurn) return;
@@ -1825,7 +1837,7 @@ function setupDragOnCard(el, card, isMyTurn) {
   el.addEventListener('dragend', () => {
     draggedCard = null;
     el.classList.remove('dragging');
-    clearWallHighlights();
+    clearShieldHighlights();
     if (gameState) renderHand(gameState.players[myPlayerId].hand, true);
   });
 
@@ -1833,7 +1845,7 @@ function setupDragOnCard(el, card, isMyTurn) {
   setupTouchDrag(el, card);
 }
 
-function setupDropOnWall(el, wallIndex, isAlive) {
+function setupDropOnShield(el, shieldIndex, isAlive) {
   if (!isAlive) return;
 
   el.addEventListener('dragover', e => {
@@ -1850,14 +1862,14 @@ function setupDropOnWall(el, wallIndex, isAlive) {
     el.classList.remove('drag-over');
     if (!draggedCard || draggedCard.type !== 'attack') return;
     hitTarget(el);
-    socket.emit('play_attack', { cardId: draggedCard.id, targetWallIndex: wallIndex });
+    socket.emit('play_attack', { cardId: draggedCard.id, targetShieldIndex: shieldIndex });
     draggedCard = null;
     selectedAttackCard = null;
-    clearWallHighlights();
+    clearShieldHighlights();
   });
 }
 
-function setupDropOnOwnWall(el, slotIndex) {
+function setupDropOnOwnShield(el, slotIndex) {
   el.addEventListener('dragover', e => {
     if (!draggedCard || draggedCard.type !== 'build') return;
     e.preventDefault();
@@ -1870,10 +1882,10 @@ function setupDropOnOwnWall(el, slotIndex) {
     el.classList.remove('drag-over-build');
     if (!draggedCard || draggedCard.type !== 'build') return;
     hitTarget(el);
-    socket.emit('play_build', { cardId: draggedCard.id, wallSlotIndex: slotIndex });
+    socket.emit('play_build', { cardId: draggedCard.id, shieldSlotIndex: slotIndex });
     draggedCard = null;
     selectedBuildCard = null;
-    clearOwnWallHighlights();
+    clearOwnShieldHighlights();
   });
 }
 
@@ -1919,8 +1931,8 @@ function setupTouchDrag(el, card) {
     dragging = false;
     draggedCard = null;
     clearHover();
-    clearWallHighlights();
-    clearOwnWallHighlights();
+    clearShieldHighlights();
+    clearOwnShieldHighlights();
   };
   const springBack = () => {
     const g = ghost; ghost = null;
@@ -1958,8 +1970,8 @@ function setupTouchDrag(el, card) {
       if (Math.hypot(t.clientX - startX, t.clientY - startY) < 8) return;
       dragging = true;
       draggedCard = card;
-      if (isAtk) { selectedAttackCard = card; highlightEnemyWalls(); holdMood('attack'); }
-      else       { selectedBuildCard  = card; highlightOwnWallSlots(); }
+      if (isAtk) { selectedAttackCard = card; highlightEnemyShields(); holdMood('attack'); }
+      else       { selectedBuildCard  = card; highlightOwnShieldSlots(); }
       ghost = el.cloneNode(true);
       ghost.classList.remove('lift', 'deal-in');
       ghost.classList.add('drag-ghost');
@@ -1980,11 +1992,11 @@ function setupTouchDrag(el, card) {
     clearHover();
     const underEl = document.elementFromPoint(t.clientX, t.clientY);
     if (isAtk) {
-      underEl?.closest('[data-wall-index]')?.classList.add('drag-over');
+      underEl?.closest('[data-shield-index]')?.classList.add('drag-over');
       const bannerEl = underEl?.closest('#direct-attack-banner');
       if (bannerEl && !bannerEl.classList.contains('hidden')) bannerEl.classList.add('aim');
     } else {
-      underEl?.closest('[data-own-wall-index]')?.classList.add('drag-over-build');
+      underEl?.closest('[data-own-shield-index]')?.classList.add('drag-over-build');
     }
   }, { passive: false });
 
@@ -1995,10 +2007,10 @@ function setupTouchDrag(el, card) {
     const underEl = document.elementFromPoint(t.clientX, t.clientY);
 
     if (isAtk) {
-      const wallEl = underEl?.closest('[data-wall-index]');
-      if (wallEl) {
-        hitTarget(wallEl); slamInto(wallEl);
-        socket.emit('play_attack', { cardId: card.id, targetWallIndex: parseInt(wallEl.dataset.wallIndex, 10) });
+      const shieldEl = underEl?.closest('[data-shield-index]');
+      if (shieldEl) {
+        hitTarget(shieldEl); slamInto(shieldEl);
+        socket.emit('play_attack', { cardId: card.id, targetShieldIndex: parseInt(shieldEl.dataset.shieldIndex, 10) });
         selectedAttackCard = null; finish(); return;
       }
       const bannerEl = underEl?.closest('#direct-attack-banner');
@@ -2009,10 +2021,10 @@ function setupTouchDrag(el, card) {
         selectedAttackCard = null; finish(); return;
       }
     } else {
-      const slotEl = underEl?.closest('[data-own-wall-index]');
+      const slotEl = underEl?.closest('[data-own-shield-index]');
       if (slotEl) {
         hitTarget(slotEl); slamInto(slotEl);
-        socket.emit('play_build', { cardId: card.id, wallSlotIndex: parseInt(slotEl.dataset.ownWallIndex, 10) });
+        socket.emit('play_build', { cardId: card.id, shieldSlotIndex: parseInt(slotEl.dataset.ownShieldIndex, 10) });
         selectedBuildCard = null; finish(); return;
       }
     }
@@ -2034,7 +2046,7 @@ function setupTouchDrag(el, card) {
 // ─── Shop ────────────────────────────────────────────────────────────────────
 const PILE_DEFS = [
   { key: 'attack', icon: '⚔️', label: 'Attack', color: 'atk', desc: 'Sword · Gun · Hammer' },
-  { key: 'build',  icon: '🏰', label: 'Build',  color: 'bld', desc: 'Stone · Wood · Gem' },
+  { key: 'build',  icon: '🛡️', label: 'Build',  color: 'bld', desc: 'Stone · Wood · Gem' },
   { key: 'wild',   icon: '✨', label: 'Wild',   color: 'wld', desc: 'Potions · Chests' },
 ];
 
@@ -2172,9 +2184,9 @@ function sendAnswer(answer) {
   pendingChallenge = null;
 
   if (ch.action === 'attack') {
-    socket.emit('solve_attack', { cardId: ch.card.id, targetWallIndex: ch.context?.wallIndex, answer });
+    socket.emit('solve_attack', { cardId: ch.card.id, targetShieldIndex: ch.context?.shieldIndex, answer });
   } else if (ch.action === 'build') {
-    socket.emit('solve_build', { cardId: ch.card.id, wallSlotIndex: ch.context?.slotIndex, answer });
+    socket.emit('solve_build', { cardId: ch.card.id, shieldSlotIndex: ch.context?.slotIndex, answer });
   } else if (ch.action === 'wild_resolve') {
     socket.emit('solve_wild_resolve', { cardId: ch.card.id, answer });
   } else {
@@ -2251,7 +2263,7 @@ function resetForNewGame() {
   endAwait();
   pendingChallenge = null;
   selectedAttackCard = null; selectedBuildCard = null; draggedCard = null; lastDropPoint = null;
-  Object.keys(_prevWalls).forEach(k => delete _prevWalls[k]);
+  Object.keys(_prevShields).forEach(k => delete _prevShields[k]);
   _prevHandIds = new Set();
   giftIds.clear(); suppressFlash.clear();
   renderGame._prevTurn = undefined; renderGame._prevActions = undefined;
@@ -2323,10 +2335,10 @@ document.addEventListener('keydown', e => {
 
 // ─── How to Play (shows once per iPad, reopen from the title screen) ─────────
 const HOW_TO = [
-  { art: '/img/Wall-Stone.png', cover: true, title: 'Welcome to the Math Arena! ⚔️',
-    body: "Destroy all of your opponent's walls, then land a direct hit to win! Guard your own walls too, or your opponent can hit you!" },
-  { art: '/img/Attack-Sword.png', title: 'Attack and Build 🏰',
-    body: "Drag an attack card onto an enemy wall to smash it. Check the wall's hint first, because some walls block some weapons! To rebuild, drag a build card onto one of your empty wall spots." },
+  { art: '/img/Shield-Stone.png', title: 'Welcome to the Math Arena! ⚔️',
+    body: "Destroy all of your opponent's shields, then land a direct hit to win! Guard your own shields too, or your opponent can hit you!" },
+  { art: '/img/Attack-Sword.png', title: 'Attack and Build 🛡️',
+    body: "Drag an attack card onto an enemy shield to smash it. Check the shield's hint first, because some shields block some weapons! To rebuild, drag a build card onto one of your empty shield spots." },
   { art: '/img/Wild-RedPotion.png', title: 'Your Turn 🎯',
     body: 'You get 3 actions every turn. Use them to shop, attack, or build. Solve the math problem to make your move count! And watch out: wild cards are for the brave!' },
 ];

@@ -7,14 +7,14 @@
 // Return shape: { message, fx } where fx carries animation hints for the client:
 //   gained:    [cardId]   cards that landed in the player's hand
 //   stolen:    number     cards taken from the opponent (Looking Glass)
-//   lostWalls: [index]    the player's own walls destroyed
+//   lostShields: [index]    the player's own shields destroyed
 //   safe:      true       Purple Potion survived
 //   handFull:  true       a free card couldn't fit
 
 const EFFECTS = {
 
-  // Buff: the next attack answered correctly destroys the target wall (no
-  // matchup check) plus one adjacent wall. Lasts until used — across turns.
+  // Buff: the next attack answered correctly destroys the target shield (no
+  // matchup check) plus one adjacent shield. Lasts until used — across turns.
   // Getting another one just refreshes it (no stacking).
   red_potion(gs, playerId) {
     const had = gs.activeEffects[playerId].doublePower;
@@ -22,7 +22,7 @@ const EFFECTS = {
     return {
       message: had
         ? '🧪 Red Potion! Still powered up (potions don\'t stack).'
-        : '🧪 Red Potion! Your next attack smashes TWO walls!',
+        : '🧪 Red Potion! Your next attack smashes TWO shields!',
       fx: {},
     };
   },
@@ -46,13 +46,13 @@ const EFFECTS = {
 
   purple_potion(gs, playerId, _card, resolveCorrect) {
     if (!resolveCorrect) {
-      const lost = gs.removeRandomWall(playerId);
+      const lost = gs.removeRandomShield(playerId);
       return {
-        message: lost >= 0 ? '🟣 Purple Potion! Wrong answer, you lost a wall!' : '🟣 Purple Potion! Wrong answer, but you had no walls left.',
-        fx: { lostWalls: lost >= 0 ? [lost] : [] },
+        message: lost >= 0 ? '🟣 Purple Potion! Wrong answer, you lost a shield!' : '🟣 Purple Potion! Wrong answer, but you had no shields left.',
+        fx: { lostShields: lost >= 0 ? [lost] : [] },
       };
     }
-    return { message: '🟣 Purple Potion! Correct! Your walls are safe.', fx: { safe: true } };
+    return { message: '🟣 Purple Potion! Correct! Your shields are safe.', fx: { safe: true } };
   },
 
   gold_chest(gs, playerId) {
@@ -81,14 +81,14 @@ const EFFECTS = {
 
   poison_drink(gs, playerId, _card, resolveCorrect) {
     const lost = [];
-    const a = gs.removeRandomWall(playerId);
+    const a = gs.removeRandomShield(playerId);
     if (a >= 0) lost.push(a);
     if (!resolveCorrect) {
-      const b = gs.removeRandomWall(playerId);
+      const b = gs.removeRandomShield(playerId);
       if (b >= 0) lost.push(b);
-      return { message: `☠️ Poison Drink! Wrong answer, you lost ${lost.length} wall${lost.length === 1 ? '' : 's'}!`, fx: { lostWalls: lost } };
+      return { message: `☠️ Poison Drink! Wrong answer, you lost ${lost.length} shield${lost.length === 1 ? '' : 's'}!`, fx: { lostShields: lost } };
     }
-    return { message: lost.length ? '☠️ Poison Drink! Lost 1 wall (unavoidable).' : '☠️ Poison Drink! …no walls left to lose.', fx: { lostWalls: lost } };
+    return { message: lost.length ? '☠️ Poison Drink! Lost 1 shield (unavoidable).' : '☠️ Poison Drink! …no shields left to lose.', fx: { lostShields: lost } };
   },
 
   armory(gs, playerId) {

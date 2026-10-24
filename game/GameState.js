@@ -2,7 +2,7 @@
 
 const {
   buildAttackPile, buildBuildPile, buildWildPile,
-  drawStartingHand, buildStartingWalls, MATCHUP, WILD_DEFS, makeEq,
+  drawStartingHand, buildStartingShields, MATCHUP, WILD_DEFS, makeEq,
 } = require('./cardData');
 const WILD_EFFECTS = require('./wildEffects');
 
@@ -43,7 +43,7 @@ class GameState {
         avatar: room.p1Avatar || 'avatar1',
         isHost: true,
         hand:  drawStartingHand(this.piles.attack),
-        walls: buildStartingWalls(),
+        shields: buildStartingShields(),
       },
       p2: {
         socketId: room.p2,
@@ -51,7 +51,7 @@ class GameState {
         avatar: room.p2Avatar || 'avatar1',
         isHost: false,
         hand:  drawStartingHand(this.piles.attack),
-        walls: buildStartingWalls(),
+        shields: buildStartingShields(),
       },
     };
 
@@ -86,7 +86,7 @@ class GameState {
       avatar: p.avatar,
       isHost: p.isHost,
       hand:   p.hand,
-      walls:  p.walls,
+      shields:  p.shields,
     };
   }
 
@@ -145,13 +145,13 @@ class GameState {
     return card;
   }
 
-  // Destroys one random active wall; returns its index (or -1 if none left).
-  removeRandomWall(playerId) {
-    const walls = this.players[playerId].walls;
-    const activeIdx = walls.map((w, i) => (w.active ? i : -1)).filter(i => i >= 0);
+  // Destroys one random active shield; returns its index (or -1 if none left).
+  removeRandomShield(playerId) {
+    const shields = this.players[playerId].shields;
+    const activeIdx = shields.map((w, i) => (w.active ? i : -1)).filter(i => i >= 0);
     if (!activeIdx.length) return -1;
     const idx = activeIdx[Math.floor(Math.random() * activeIdx.length)];
-    walls[idx].active = false;
+    shields[idx].active = false;
     return idx;
   }
 
@@ -192,9 +192,9 @@ class GameState {
 
   _checkWin(attackerId) {
     const oppId = this._oppId(attackerId);
-    const oppWalls = this.players[oppId].walls;
-    if (oppWalls.some(w => w.active)) return null; // still has walls
-    return null; // Walls gone — next direct attack wins (handled in solveAttack)
+    const oppShields = this.players[oppId].shields;
+    if (oppShields.some(w => w.active)) return null; // still has shields
+    return null; // Shields gone — next direct attack wins (handled in solveAttack)
   }
 
   // ─── Shop ──────────────────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ class GameState {
   }
 
   // ─── Play attack ───────────────────────────────────────────────────────────
-  playAttack(playerId, cardId, targetWallIndex) {
+  playAttack(playerId, cardId, targetShieldIndex) {
     if (!this._isMyTurn(playerId))           return { type: 'error', message: "It's not your turn." };
     if (this.actionsLeft <= 0)               return { type: 'error', message: 'No actions left.' };
 
@@ -330,38 +330,38 @@ class GameState {
 
     const oppId = this._oppId(playerId);
     const opp   = this.players[oppId];
-    const anyWall = opp.walls.some(w => w.active);
+    const anyShield = opp.shields.some(w => w.active);
 
-    // Attempted direct attack but walls remain
-    if (targetWallIndex === -1 && anyWall) {
-      return { type: 'error', message: 'Destroy all enemy walls before landing a direct attack!' };
+    // Attempted direct attack but shields remain
+    if (targetShieldIndex === -1 && anyShield) {
+      return { type: 'error', message: 'Destroy all enemy shields before landing a direct attack!' };
     }
 
-    // Attempted wall attack but no walls left
-    if (targetWallIndex !== -1 && !anyWall) {
-      return { type: 'info', message: 'All walls are gone. Use Direct Attack!' };
+    // Attempted shield attack but no shields left
+    if (targetShieldIndex !== -1 && !anyShield) {
+      return { type: 'info', message: 'All shields are gone. Use Direct Attack!' };
     }
 
     const noMath = this.activeEffects[playerId].noMath;
-    const context = { wallIndex: targetWallIndex };
+    const context = { shieldIndex: targetShieldIndex };
 
     if (noMath) {
       this.activeEffects[playerId].noMath = false; // Spell Book used up
       this.removeFromHand(playerId, cardId);
-      const res = this._resolveAttack(playerId, card, targetWallIndex, true);
+      const res = this._resolveAttack(playerId, card, targetShieldIndex, true);
       res.message = '📕 No math! ' + res.message;
       if (res.fx) res.fx.spellUsed = true;
       return res;
     }
 
-    this._pending = { playerId, action: 'attack', card, cardId, wallIndex: targetWallIndex };
+    this._pending = { playerId, action: 'attack', card, cardId, shieldIndex: targetShieldIndex };
     return {
       mathChallenge: { card, action: 'attack', context },
     };
   }
 
   // ─── Solve attack ──────────────────────────────────────────────────────────
-  solveAttack(playerId, cardId, targetWallIndex, answer) {
+  solveAttack(playerId, cardId, targetShieldIndex, answer) {
     const p = this._pending;
     if (!p || p.playerId !== playerId || p.action !== 'attack') return null;
     this._pending = null;
@@ -384,17 +384,17 @@ class GameState {
       };
     }
 
-    return this._resolveAttack(playerId, card, targetWallIndex, true);
+    return this._resolveAttack(playerId, card, targetShieldIndex, true);
   }
 
-  _resolveAttack(playerId, card, targetWallIndex, mathCorrect) {
+  _resolveAttack(playerId, card, targetShieldIndex, mathCorrect) {
     const oppId = this._oppId(playerId);
     const opp   = this.players[oppId];
     const me    = this.players[playerId];
 
-    // Direct attack (all walls gone)
-    const anyWall = opp.walls.some(w => w.active);
-    if (!anyWall) {
+    // Direct attack (all shields gone)
+    const anyShield = opp.shields.some(w => w.active);
+    if (!anyShield) {
       this._useAction();
       this.phase  = 'gameover';
       this.winner = playerId;
@@ -407,82 +407,82 @@ class GameState {
       };
     }
 
-    const wall = opp.walls[targetWallIndex];
-    if (!wall || !wall.active) {
+    const shield = opp.shields[targetShieldIndex];
+    if (!shield || !shield.active) {
       this._useAction();
-      return { type: 'info', message: 'That wall is already destroyed.', stateUpdated: true, fx: { kind: 'correct' } };
+      return { type: 'info', message: 'That shield is already destroyed.', stateUpdated: true, fx: { kind: 'correct' } };
     }
 
-    // Red Potion: free destroy — target wall (no matchup check) + one adjacent wall.
+    // Red Potion: free destroy — target shield (no matchup check) + one adjacent shield.
     if (this.activeEffects[playerId].doublePower) {
       this.activeEffects[playerId].doublePower = false;
-      wall.active = false;
-      const adjacent = [targetWallIndex - 1, targetWallIndex + 1]
-        .filter(i => i >= 0 && i < opp.walls.length && opp.walls[i].active);
+      shield.active = false;
+      const adjacent = [targetShieldIndex - 1, targetShieldIndex + 1]
+        .filter(i => i >= 0 && i < opp.shields.length && opp.shields[i].active);
       const also = adjacent.length ? adjacent[Math.floor(Math.random() * adjacent.length)] : -1;
-      if (also >= 0) opp.walls[also].active = false;
+      if (also >= 0) opp.shields[also].active = false;
       this._useAction();
       return {
         type: 'success',
         message: also >= 0
-          ? `🧪 Power attack! ${wall.type} AND ${opp.walls[also].type} walls destroyed!`
-          : `🧪 Power attack! ${wall.type} wall destroyed!`,
+          ? `🧪 Power attack! ${shield.type} AND ${opp.shields[also].type} shields destroyed!`
+          : `🧪 Power attack! ${shield.type} shield destroyed!`,
         stateUpdated: true,
-        fx: { kind: 'smash', cardSub: card.sub, cardIcon: card.icon, target: targetWallIndex, also, potion: true },
+        fx: { kind: 'smash', cardSub: card.sub, cardIcon: card.icon, target: targetShieldIndex, also, potion: true },
       };
     }
 
     const match = MATCHUP[card.sub];
-    const breaks = match?.breaks?.includes(wall.type);
+    const breaks = match?.breaks?.includes(shield.type);
 
     this._useAction();
     if (breaks) {
-      wall.active = false;
+      shield.active = false;
       return {
         type: 'success',
-        message: `⚔️ ${card.sub} smashes ${wall.type} wall!`,
+        message: `⚔️ ${card.sub} smashes ${shield.type} shield!`,
         stateUpdated: true,
-        fx: { kind: 'smash', cardSub: card.sub, cardIcon: card.icon, target: targetWallIndex, also: -1 },
+        fx: { kind: 'smash', cardSub: card.sub, cardIcon: card.icon, target: targetShieldIndex, also: -1 },
       };
     }
     return {
       type: 'info',
-      message: `🛡 ${wall.type} wall blocked ${card.sub}!`,
+      message: `🛡 ${shield.type} shield blocked ${card.sub}!`,
       stateUpdated: true,
-      fx: { kind: 'blocked', cardSub: card.sub, cardIcon: card.icon, target: targetWallIndex },
+      fx: { kind: 'blocked', cardSub: card.sub, cardIcon: card.icon, target: targetShieldIndex },
     };
   }
 
   // ─── Play build ────────────────────────────────────────────────────────────
-  playBuild(playerId, cardId, wallSlotIndex) {
+  playBuild(playerId, cardId, shieldSlotIndex) {
     if (!this._isMyTurn(playerId))     return { type: 'error', message: "It's not your turn." };
     if (this.actionsLeft <= 0)         return { type: 'error', message: 'No actions left.' };
 
     const card = this.players[playerId].hand.find(c => c.id === cardId);
     if (!card || card.type !== 'build') return { type: 'error', message: 'Card not found.' };
 
-    const slot = this.players[playerId].walls[wallSlotIndex];
-    if (!slot)          return { type: 'error', message: 'Invalid wall slot.' };
-    if (slot.active)    return { type: 'error', message: 'That wall slot is already occupied.' };
+    const slot = this.players[playerId].shields[shieldSlotIndex];
+    if (!slot)          return { type: 'error', message: 'Invalid shield slot.' };
+    if (slot.active)    return { type: 'error', message: 'That shield slot is already occupied.' };
 
     const noMath = this.activeEffects[playerId].noMath;
     if (noMath) {
       this.activeEffects[playerId].noMath = false; // Spell Book used up
       this.removeFromHand(playerId, cardId);
-      const res = this._resolveBuild(playerId, card, wallSlotIndex, true);
+      const res = this._resolveBuild(playerId, card, shieldSlotIndex, true);
       res.message = '📕 No math! ' + res.message;
       if (res.fx) res.fx.spellUsed = true;
       return res;
     }
 
-    this._pending = { playerId, action: 'build', card, cardId, slotIndex: wallSlotIndex };
+    this._pending = { playerId, action: 'build', card, cardId, slotIndex: shieldSlotIndex };
     return {
-      mathChallenge: { card, action: 'build', context: { slotIndex: wallSlotIndex } },
+      mathChallenge: { card, action: 'build', context: { slotIndex: shieldSlotIndex } },
     };
   }
 
   // ─── Solve build ───────────────────────────────────────────────────────────
-  solveBuild(playerId, cardId, wallSlotIndex, answer) {
+  solveBuild(playerId, cardId, shieldSlotIndex, answer) {
     const p = this._pending;
     if (!p || p.playerId !== playerId || p.action !== 'build') return null;
     this._pending = null;
@@ -494,30 +494,30 @@ class GameState {
       this._useAction();
       return {
         type: 'error',
-        message: `✗ Wrong! Wall not placed. The answer was ${card?.answer}.`,
+        message: `✗ Wrong! Shield not placed. The answer was ${card?.answer}.`,
         stateUpdated: true,
         fx: { kind: 'wrong', answer: card?.answer },
       };
     }
 
-    return this._resolveBuild(playerId, card, wallSlotIndex, true);
+    return this._resolveBuild(playerId, card, shieldSlotIndex, true);
   }
 
-  _resolveBuild(playerId, card, wallSlotIndex, correct) {
+  _resolveBuild(playerId, card, shieldSlotIndex, correct) {
     if (!correct) {
       this._useAction();
-      return { type: 'error', message: 'Wall not placed.', stateUpdated: true };
+      return { type: 'error', message: 'Shield not placed.', stateUpdated: true };
     }
-    const slot = this.players[playerId].walls[wallSlotIndex];
+    const slot = this.players[playerId].shields[shieldSlotIndex];
     slot.type   = card.sub;
     slot.icon   = card.icon;
     slot.active = true;
     this._useAction();
     return {
       type: 'success',
-      message: `🏰 ${card.sub} wall built!`,
+      message: `🏰 ${card.sub} shield built!`,
       stateUpdated: true,
-      fx: { kind: 'built', target: wallSlotIndex },
+      fx: { kind: 'built', target: shieldSlotIndex },
     };
   }
 

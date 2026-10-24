@@ -20,7 +20,7 @@
   --gold-hi:    #e8c84e;
 
   /* Sizing tokens */
-  --wall-w:  clamp(70px, 22vw, 160px);
+  --shield-w:  clamp(70px, 22vw, 160px);
   --hand-w:  clamp(58px, 18vw, 132px);
   --own-w:   clamp(54px, 17vw, 120px);
   --pile-w:  clamp(88px, 28vw, 180px);
@@ -270,13 +270,13 @@ html, body {
 }
 .hand-card:active { cursor: grabbing; transform: scale(1.06); }
 
-/* Wall cards */
-.wall-card {
-  width: var(--wall-w);
+/* Shield cards */
+.shield-card {
+  width: var(--shield-w);
   aspect-ratio: 64/96;
 }
-.wall-card.dead { opacity: 0.25; filter: grayscale(1); }
-.wall-card.empty {
+.shield-card.dead { opacity: 0.25; filter: grayscale(1); }
+.shield-card.empty {
   border: 2px dashed var(--rim);
   background: transparent;
   opacity: 0.35;
@@ -459,7 +459,7 @@ html, body {
   text-align: center;
 }
 
-.wall-row {
+.shield-row {
   display: flex;
   gap: var(--gap);
   justify-content: center;
@@ -599,13 +599,13 @@ html, body {
   opacity: 0.35;
   transform: scale(0.95);
 }
-.wall-card.drag-over {
+.shield-card.drag-over {
   box-shadow: 0 0 18px rgba(176,30,44,1) !important;
   border: 2.5px solid var(--red-hi) !important;
   transform: scale(1.06);
   transition: transform 0.1s;
 }
-.wall-card.drag-over-build {
+.shield-card.drag-over-build {
   box-shadow: 0 0 18px rgba(30,122,52,1) !important;
   border: 2.5px solid var(--green-hi) !important;
   transform: scale(1.06);
@@ -618,20 +618,20 @@ html, body {
   50%       { box-shadow: 0 0 22px rgba(176,30,44,1);  transform: scale(1.04); }
 }
 
-/* ─── Wall flash animations ────────────────────────────────────────────────── */
-@keyframes wall-destroy {
+/* ─── Shield flash animations ────────────────────────────────────────────────── */
+@keyframes shield-destroy {
   0%   { transform: scale(1);    filter: brightness(1);   opacity: 1; box-shadow: none; }
   20%  { transform: scale(1.12); filter: brightness(2.2); opacity: 1; box-shadow: 0 0 28px rgba(176,30,44,1); }
   60%  { transform: scale(0.85); filter: brightness(0.7); opacity: 0.6; }
   100% { transform: scale(1);    filter: none;            opacity: 1; }
 }
-@keyframes wall-build {
+@keyframes shield-build {
   0%   { transform: scale(0.7); opacity: 0; box-shadow: none; }
   50%  { transform: scale(1.1); opacity: 1; box-shadow: 0 0 22px rgba(30,122,52,0.9); }
   100% { transform: scale(1);   opacity: 1; box-shadow: none; }
 }
-.wall-card.flash-destroy { animation: wall-destroy 0.55s ease-out forwards; }
-.wall-card.flash-build   { animation: wall-build   0.45s ease-out forwards; }
+.shield-card.flash-destroy { animation: shield-destroy 0.55s ease-out forwards; }
+.shield-card.flash-build   { animation: shield-build   0.45s ease-out forwards; }
 
 /* ─── Action log strip ──────────────────────────────────────────────────────── */
 .action-log {
@@ -686,19 +686,19 @@ html, body {
   pointer-events: none;
 }
 
-/* ─── Stone wall (grey, no tint) ───────────────────────────────────────────── */
-.wall-stone {
+/* ─── Stone shield (grey, no tint) ───────────────────────────────────────────── */
+.shield-stone {
   background: linear-gradient(160deg, #2a2e38, #1a1e26);
   border-color: #4a5068;
 }
-.wait-walls-section {
+.wait-shields-section {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: clamp(8px,2.5vw,12px);
   margin: auto 0;
 }
-.wait-walls-label {
+.wait-shields-label {
   font-size: var(--fs-xs);
   color: var(--text-dim);
   letter-spacing: 0.14em;
@@ -772,8 +772,8 @@ html, body {
 }
 
 /* Hovered drop target wobbles */
-.wall-card.drag-over,
-.wall-card.drag-over-build { animation: target-wobble 0.45s ease-in-out infinite; }
+.shield-card.drag-over,
+.shield-card.drag-over-build { animation: target-wobble 0.45s ease-in-out infinite; }
 @keyframes target-wobble {
   0%, 100% { transform: scale(1.08) rotate(0deg); }
   25%      { transform: scale(1.08) rotate(-3deg); }
@@ -819,7 +819,7 @@ html, body {
   position: fixed; inset: 0; z-index: 9989; pointer-events: none;
 }
 
-/* Projectile thrown at a wall */
+/* Projectile thrown at a shield */
 .fx-projectile {
   position: fixed; z-index: 9996; pointer-events: none;
   font-size: clamp(30px, 9vw, 60px);
@@ -873,7 +873,7 @@ html, body {
 /* Respect iPad "Reduce Motion" */
 @media (prefers-reduced-motion: reduce) {
   .hand-card.lift { transform: none !important; }
-  .wall-card.drag-over, .wall-card.drag-over-build,
+  .shield-card.drag-over, .shield-card.drag-over-build,
   .math-big-card.awaiting, .math-big-card.urgent,
   .hand-card.deal-in, .ap-dot.pop-in, .ap-dot.pop-out,
   .gameover-panel.win, .gameover-panel.lose { animation: none !important; }
@@ -882,14 +882,14 @@ html, body {
 /* Leave room for the mute button in the HUD */
 .game-hud { padding-right: calc(var(--pad-h) + clamp(34px, 9vw, 50px)); }
 
-/* Upgraded wall build: drops in from above with a bounce */
-@keyframes wall-build {
+/* Upgraded shield build: drops in from above with a bounce */
+@keyframes shield-build {
   0%   { transform: translateY(-60px) scale(1.2); opacity: 0; }
   55%  { transform: translateY(0) scale(0.92);    opacity: 1; box-shadow: 0 0 26px rgba(30,122,52,1); }
   75%  { transform: translateY(-8px) scale(1.04); }
   100% { transform: translateY(0) scale(1);       box-shadow: none; }
 }
-.wall-card.flash-build { animation: wall-build 0.6s cubic-bezier(.3,1.2,.5,1) forwards; }
+.shield-card.flash-build { animation: shield-build 0.6s cubic-bezier(.3,1.2,.5,1) forwards; }
 
 /* ═══ Wild card effects ═══════════════════════════════════════════════════ */
 .buff-badges { display: flex; gap: 6px; }
@@ -954,7 +954,7 @@ html, body {
   background: #05060a;
   overflow: hidden;
 }
-/* Every art card (hand, walls, piles, big modal cards) is its own size reference */
+/* Every art card (hand, shields, piles, big modal cards) is its own size reference */
 .art-card { container-type: inline-size; }
 .art-card .ac-bg, .art-card .ac-art, .art-card .ac-frame, .art-card .ac-q {
   position: absolute; inset: 0; pointer-events: none;
@@ -973,8 +973,20 @@ html, body {
   filter: drop-shadow(0 4px 6px rgba(0,0,0,0.6));
 }
 
-.art-card .ac-frame { background: url('/img/CardFront-Border.png') center / 100% 100% no-repeat; }
-.art-card .ac-frame-back { background-image: url('/img/CardBack-Border.png'); }
+/* Shields: gold-brown, so they read differently from attack / build / wild */
+.art-card .ac-bg-shield { background: radial-gradient(ellipse 70% 55% at 50% 42%, #9a6a22 0%, #4e3010 55%, #1f1205 100%); }
+/* Shields fill more of the card than weapons/items (they're the card's subject) */
+.art-card .ac-art-shield { inset: 9% 11% 30% 11%; }
+
+/* One frame per card type (fronts) and per pile (backs) */
+.art-card .ac-frame { background: url('/img/CardFront-Attack.png') center / 100% 100% no-repeat; }
+.art-card .ac-frame-atk    { background-image: url('/img/CardFront-Attack.png'); }
+.art-card .ac-frame-bld,
+.art-card .ac-frame-shield { background-image: url('/img/CardFront-Build.png'); }
+.art-card .ac-frame-wld    { background-image: url('/img/CardFront-Wild.png'); }
+.art-card .ac-frame-back-atk { background-image: url('/img/CardBack-Attack.png'); }
+.art-card .ac-frame-back-bld { background-image: url('/img/CardBack-Build.png'); }
+.art-card .ac-frame-back-wld { background-image: url('/img/CardBack-Wild.png'); }
 
 /* Text column sits inside the frame opening, stacked from the bottom */
 .art-card .ac-content {
@@ -1008,12 +1020,12 @@ html, body {
   border-radius: 3cqw;
   padding: 1.2cqw 2.5cqw;
 }
-/* Placed walls: bigger name + hint, no plate */
-.art-card .ac-wall { gap: 2cqw; padding-bottom: 2cqw; }
-.art-card .ac-wall .ac-name { font-size: max(10px, 11cqw); }
-.art-card .ac-wall .ac-hint { font-size: max(8px, 7cqw); }
-.wall-card.dead .ac-name, .wall-card.dead .ac-hint { opacity: 0.6; }
-.wall-card.dead { opacity: 1; filter: none; }   /* the art itself is greyed instead */
+/* Placed shields: bigger name + hint, no plate */
+.art-card .ac-shield { gap: 2cqw; padding-bottom: 2cqw; }
+.art-card .ac-shield .ac-name { font-size: max(10px, 11cqw); }
+.art-card .ac-shield .ac-hint { font-size: max(8px, 7cqw); }
+.shield-card.dead .ac-name, .shield-card.dead .ac-hint { opacity: 0.6; }
+.shield-card.dead { opacity: 1; filter: none; }   /* the art itself is greyed instead */
 
 /* Card back: big ? in the middle */
 .art-card .ac-q {
@@ -1130,7 +1142,7 @@ html, body {
   font-family: 'Cinzel', serif; font-size: var(--fs-xl); color: var(--text-dim);
 }
 
-/* Enemy zone header: portrait + "Bot's Walls" */
+/* Enemy zone header: portrait + "Bot's Shields" */
 .zone-head { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: clamp(6px,2vw,10px); }
 .zone-head .zone-label { margin-bottom: 0; }
 
@@ -1194,9 +1206,9 @@ html, body {
 
 /* ═══ Fit shorter screens (older iPads, Safari tab bar, landscape) ═══════════
    Card sizes are capped by screen HEIGHT as well as width so the hand,
-   Shop/Pass buttons and both wall rows always fit without overlapping. */
+   Shop/Pass buttons and both shield rows always fit without overlapping. */
 :root {
-  --wall-w: min(clamp(70px, 22vw, 160px), 12.5vh);
+  --shield-w: min(clamp(70px, 22vw, 160px), 12.5vh);
   --own-w:  min(clamp(54px, 17vw, 120px), 10vh);
   --hand-w: min(clamp(58px, 18vw, 132px), 12vh);
 }
@@ -1211,7 +1223,7 @@ html, body {
 }
 
 /* ═══ Final strike: opponent's face is the target (v1.5.0) ═══════════════ */
-.enemy-zone.final-stand #enemy-walls,
+.enemy-zone.final-stand #enemy-shields,
 .enemy-zone.final-stand .zone-head .avatar-portrait { display: none; }
 .final-target {
   display: flex; flex-direction: column; align-items: center; gap: clamp(6px, 1.2vh, 12px);
@@ -1226,8 +1238,8 @@ html, body {
   0%, 100% { box-shadow: 0 0 0 3px rgba(176,30,44,0.9), 0 0 18px 4px rgba(176,30,44,0.55); }
   50%      { box-shadow: 0 0 0 5px rgba(255,71,87,1),   0 0 34px 10px rgba(255,71,87,0.75); }
 }
-/* About the height of a wall card, so it fills the space the walls left */
-.avatar-portrait.xl { width: calc(var(--wall-w) * 1.3); border-width: 4px; }
+/* About the height of a shield card, so it fills the space the shields left */
+.avatar-portrait.xl { width: calc(var(--shield-w) * 1.3); border-width: 4px; }
 .final-label {
   font-family: 'Cinzel', serif; font-weight: 900; font-size: var(--fs-md);
   color: #ff8a95; letter-spacing: 0.06em; text-shadow: 0 0 10px rgba(176,30,44,0.8);
@@ -1237,4 +1249,35 @@ html, body {
 .final-target.aim .avatar-portrait { filter: brightness(1.12); }
 @media (prefers-reduced-motion: reduce) {
   .final-ring, .final-target.aim .final-ring { animation: none; box-shadow: 0 0 0 4px rgba(255,71,87,1); }
+}
+
+/* Math-Arena logo on the lobby screens. Height-capped so short iPads / landscape
+   never push the buttons off screen. */
+.logo-img { display: block; margin: 0 auto; width: min(86vw, 520px); max-height: 30vh; object-fit: contain;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,0.55)); }
+.logo-img-sm { width: min(56vw, 300px); max-height: 15vh; }
+@media (max-height: 820px) { .logo-img-sm { max-height: 10vh; } .logo-img { max-height: 24vh; } }
+
+/* Dead shields: grey the art along with the card (ac-art's own filter used to win) */
+.art-card .ac-art.ac-dead { filter: grayscale(1) brightness(0.38); }
+
+/* Waiting screen: your own face under your shields */
+.wait-me-section { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: auto; }
+.wait-me-name { font-family: 'Cinzel', serif; font-size: var(--fs-sm); color: var(--text); }
+@media (max-height: 820px) { #wait-my-avatar { width: min(clamp(70px, 20vw, 110px), 11vh); } }
+
+/* ═══ Solve screen fits phones (Android Chrome address/nav bars) ════════════
+   dvh = the height you can actually see; vh lines above stay as fallback. */
+.math-modal-screen {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.np-key { height: clamp(40px, 6vh, 60px); height: clamp(40px, 6dvh, 60px); }
+.math-big-card.art-card { width: min(100%, 24vh); width: min(100%, 24dvh); }
+.math-modal-inner { gap: clamp(6px, 1.3vh, 14px); gap: clamp(6px, 1.3dvh, 14px); }
+@media (max-width: 600px) {
+  .numpad { gap: clamp(5px, 1.4vw, 8px); }
+}
+@media (orientation: landscape) and (max-height: 900px) {
+  .math-modal-inner > .math-big-card { width: min(40vh, 300px); width: min(40dvh, 300px); }
 }
