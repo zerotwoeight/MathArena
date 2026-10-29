@@ -1,11 +1,18 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const crypto = require('crypto');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+// Phones (Android especially) go quiet when the screen locks or the app is
+// switched. Be patient before calling a socket dead; the 10-minute rejoin
+// window below covers longer gaps.
+const io = new Server(server, {
+  pingInterval: 25000,  // heartbeat every 25s
+  pingTimeout:  60000,  // wait 60s for a reply before dropping
+});
 
 const PORT = process.env.PORT || 3000;
 
@@ -30,6 +37,28 @@ const cleanAvatar = a => (typeof a === 'string' && /^avatar\d{1,2}$/.test(a)) ? 
 // ─── Room state ───────────────────────────────────────────────────────────────
 // rooms Map: roomCode → { p1: socketId, p2: socketId|null, p1Name, p2Name, p1Diff, p2Diff, state }
 const rooms = new Map();
+
+// ─── Reconnect / rejoin ───────────────────────────────────────────────────────
+// Each seat gets a secret session key, saved on the device. If the connection
+// drops, the room is kept and the player's seat waits for them. The phone
+// rejoins automatically with its key. If they're not back in time, the room ends.
+const REJOIN_WINDOW_MS   = 10 * 60 * 1000; // mid-game / lobby: 10 minutes
+const GAMEOVER_WINDOW_MS =  5 * 60 * 1000; // game over screen: 5 minutes
+const newKey = () => crypto.randomBytes(12).toString('hex');
+const otherSeat = pid => (pid === 'p1' ? 'p2' : 'p1');
+
+// A room is paused while any seated player is away
+const isPaused = room => !!(room.away && (room.away.p1 || room.away.p2));
+
+function endRoom(code, reason) {
+  const room = rooms.get(code);
+  if (!room) return;
+  for (const pid of ['p1', 'p2']) clearTimeout(room.awayTimers?.[pid]);
+  io.to(code).emit('session_expired', { reason });
+  io.in(code).socketsLeave(code);
+  rooms.delete(code);
+  console.log(`[room] ${code} closed (${reason})`);
+}
 
 function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/I/1 confusion
@@ -59,6 +88,10 @@ io.on('connection', (socket) => {
       p1Avatar: cleanAvatar(avatar),
       p2Avatar: 'avatar1',
       state: null,
+      keys: { p1: newKey(), p2: null },
+      away: { p1: null, p2: null },      // timestamp when a seat dropped
+      awayTimers: { p1: null, p2: null },
+      lastChallenge: { p1: null, p2: null },
     });
     socket.join(roomCode);
     socket.roomCode = roomCode;
@@ -66,6 +99,7 @@ io.on('connection', (socket) => {
 
     console.log(`[room] ${roomCode} created by ${name} (${socket.id})`);
 
+    socket.emit('session', { roomCode, playerId: 'p1', sessionKey: rooms.get(roomCode).keys.p1 });
     socket.emit('room_created', {
       roomCode,
       playerId: 'p1',
@@ -98,6 +132,8 @@ io.on('connection', (socket) => {
 
     console.log(`[room] ${code} joined by ${name} (${socket.id})`);
 
+    room.keys.p2 = newKey();
+    socket.emit('session', { roomCode: code, playerId: 'p2', sessionKey: room.keys.p2 });
     socket.emit('room_joined', { playerId: 'p2' });
 
     // Notify host that P2 joined
@@ -116,6 +152,66 @@ io.on('connection', (socket) => {
       p1Avatar: room.p1Avatar,
       p2Avatar: room.p2Avatar,
     });
+  });
+
+  // ── rejoin: a device that dropped comes back with its session key ─────────
+  socket.on('rejoin', ({ roomCode, sessionKey } = {}) => {
+    const code = String(roomCode || '').toUpperCase();
+    const room = rooms.get(code);
+    const pid = room && ['p1', 'p2'].find(id => room.keys[id] && room.keys[id] === sessionKey);
+    if (!room || !pid) {
+      socket.emit('session_expired', { reason: 'expired' });
+      return;
+    }
+
+    // Take the seat back (the old socket, if still lingering, is replaced)
+    const oldId = room[pid];
+    if (oldId && oldId !== socket.id) io.sockets.sockets.get(oldId)?.disconnect(true);
+    room[pid] = socket.id;
+    socket.join(code);
+    socket.roomCode = code;
+    socket.playerId = pid;
+
+    const wasAway = !!room.away[pid];
+    clearTimeout(room.awayTimers[pid]);
+    room.awayTimers[pid] = null;
+    room.away[pid] = null;
+    console.log(`[rejoin] ${code} ${pid} (${socket.id})${wasAway ? '' : ' (quick)'}`);
+
+    socket.emit('rejoined', { playerId: pid, roomCode: code, inGame: !!room.state });
+
+    if (!room.state) {
+      // Still in the lobby: replay what the lobby screens need
+      if (pid === 'p1') {
+        socket.emit('room_created', { roomCode: code, playerId: 'p1', serverUrl: '' });
+        if (room.p2) socket.emit('player_joined', { p2Name: room.p2Name, p2Avatar: room.p2Avatar });
+      } else {
+        socket.emit('room_joined', { playerId: 'p2' });
+        socket.emit('lobby_state', {
+          roomCode: code, p1Name: room.p1Name, p2Name: room.p2Name,
+          p1Diff: room.p1Diff, p2Diff: room.p2Diff, p1Avatar: room.p1Avatar, p2Avatar: room.p2Avatar,
+        });
+      }
+    } else {
+      socket.emit('game_state', { state: room.state.getPublicState() });
+      // If they were in the middle of a math problem, put it back on screen
+      const ch = room.lastChallenge[pid];
+      if (ch && room.state._pending && room.state._pending.playerId === pid) socket.emit('math_challenge', ch);
+      if (room.state.phase === 'gameover') socket.emit('game_over', { winner: room.state.winner });
+    }
+
+    const other = otherSeat(pid);
+    if (room.away[other]) {
+      const name = other === 'p1' ? room.p1Name : room.p2Name;
+      socket.emit('opponent_away', { name, until: room.away[other] + REJOIN_WINDOW_MS });
+    }
+    if (wasAway) {
+      socket.to(code).emit('opponent_back', { name: pid === 'p1' ? room.p1Name : room.p2Name });
+      // An answer sent during the pause was ignored: hand the other player their problem again
+      const otherSock = room[other] && io.sockets.sockets.get(room[other]);
+      const och = room.lastChallenge[other];
+      if (otherSock && och && room.state?._pending?.playerId === other) otherSock.emit('math_challenge', och);
+    }
   });
 
   // ── set_mood: relay a player's avatar mood to their opponent ────────────────
@@ -165,7 +261,7 @@ io.on('connection', (socket) => {
   // ── shop_pick ────────────────────────────────────────────────────────────────
   socket.on('shop_pick', ({ pileType }) => {
     const room = rooms.get(socket.roomCode);
-    if (!room?.state) return;
+    if (!room?.state || isPaused(room)) return;
     const result = room.state.shopPick(socket.playerId, pileType);
     handleActionResult(socket, room, result);
   });
@@ -173,7 +269,7 @@ io.on('connection', (socket) => {
   // ── solve_draw ───────────────────────────────────────────────────────────────
   socket.on('solve_draw', ({ cardId, answer }) => {
     const room = rooms.get(socket.roomCode);
-    if (!room?.state) return;
+    if (!room?.state || isPaused(room)) return;
     const result = room.state.solveDraw(socket.playerId, cardId, Number(answer));
     handleActionResult(socket, room, result);
   });
@@ -181,7 +277,7 @@ io.on('connection', (socket) => {
   // ── solve_wild_resolve ───────────────────────────────────────────────────────
   socket.on('solve_wild_resolve', ({ cardId, answer }) => {
     const room = rooms.get(socket.roomCode);
-    if (!room?.state) return;
+    if (!room?.state || isPaused(room)) return;
     const result = room.state.solveWildResolve(socket.playerId, cardId, Number(answer));
     handleActionResult(socket, room, result);
   });
@@ -189,7 +285,7 @@ io.on('connection', (socket) => {
   // ── play_attack ──────────────────────────────────────────────────────────────
   socket.on('play_attack', ({ cardId, targetShieldIndex }) => {
     const room = rooms.get(socket.roomCode);
-    if (!room?.state) return;
+    if (!room?.state || isPaused(room)) return;
     const result = room.state.playAttack(socket.playerId, cardId, targetShieldIndex);
     handleActionResult(socket, room, result);
   });
@@ -197,7 +293,7 @@ io.on('connection', (socket) => {
   // ── solve_attack ─────────────────────────────────────────────────────────────
   socket.on('solve_attack', ({ cardId, targetShieldIndex, answer }) => {
     const room = rooms.get(socket.roomCode);
-    if (!room?.state) return;
+    if (!room?.state || isPaused(room)) return;
     const result = room.state.solveAttack(socket.playerId, cardId, targetShieldIndex, Number(answer));
     handleActionResult(socket, room, result);
   });
@@ -205,7 +301,7 @@ io.on('connection', (socket) => {
   // ── play_build ───────────────────────────────────────────────────────────────
   socket.on('play_build', ({ cardId, shieldSlotIndex }) => {
     const room = rooms.get(socket.roomCode);
-    if (!room?.state) return;
+    if (!room?.state || isPaused(room)) return;
     const result = room.state.playBuild(socket.playerId, cardId, shieldSlotIndex);
     handleActionResult(socket, room, result);
   });
@@ -213,7 +309,7 @@ io.on('connection', (socket) => {
   // ── solve_build ──────────────────────────────────────────────────────────────
   socket.on('solve_build', ({ cardId, shieldSlotIndex, answer }) => {
     const room = rooms.get(socket.roomCode);
-    if (!room?.state) return;
+    if (!room?.state || isPaused(room)) return;
     const result = room.state.solveBuild(socket.playerId, cardId, shieldSlotIndex, Number(answer));
     handleActionResult(socket, room, result);
   });
@@ -221,7 +317,7 @@ io.on('connection', (socket) => {
   // ── end_turn ─────────────────────────────────────────────────────────────────
   socket.on('end_turn', () => {
     const room = rooms.get(socket.roomCode);
-    if (!room?.state) return;
+    if (!room?.state || isPaused(room)) return;
     const result = room.state.endTurn(socket.playerId);
     handleActionResult(socket, room, result);
   });
@@ -255,6 +351,7 @@ io.on('connection', (socket) => {
     if (!room) return;
     const name = socket.playerId === 'p1' ? room.p1Name : room.p2Name;
     socket.to(code).emit('opponent_left', { name });
+    for (const pid of ['p1', 'p2']) clearTimeout(room.awayTimers?.[pid]);
     socket.leave(code);
     socket.roomCode = null;
     rooms.delete(code);
@@ -268,11 +365,22 @@ io.on('connection', (socket) => {
     const room = rooms.get(code);
     if (!room) return;
 
-    const name = socket.playerId === 'p1' ? room.p1Name : room.p2Name;
-    // Notify the OTHER player specifically so the client can show the disconnect overlay
-    socket.to(code).emit('opponent_disconnected', { name });
+    const pid = socket.playerId;
+    // Ignore an old socket that was already replaced by a rejoin
+    if (room[pid] !== socket.id) return;
 
-    rooms.delete(code);
+    // Don't end the game: hold the seat and pause until they rejoin
+    const name = pid === 'p1' ? room.p1Name : room.p2Name;
+    const holdMs = room.state?.phase === 'gameover' ? GAMEOVER_WINDOW_MS : REJOIN_WINDOW_MS;
+    room.away[pid] = Date.now();
+    clearTimeout(room.awayTimers[pid]);
+    room.awayTimers[pid] = setTimeout(() => {
+      if (rooms.get(code) === room && room.away[pid]) endRoom(code, `${name} didn't come back`);
+    }, holdMs);
+    console.log(`[away] ${code} ${pid} ${name} — holding seat ${holdMs / 60000} min`);
+
+    socket.to(code).emit('opponent_away', { name, until: room.away[pid] + holdMs });
+
   });
 });
 
@@ -295,6 +403,7 @@ function handleActionResult(socket, room, result) {
 
   // Private math challenge → only to the requesting player
   if (result.mathChallenge) {
+    room.lastChallenge[socket.playerId] = result.mathChallenge; // re-sent if they rejoin mid-problem
     socket.emit('math_challenge', result.mathChallenge);
   }
 

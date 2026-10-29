@@ -9,32 +9,31 @@ let cardSeq = 0;
 function nextId(prefix) { return `${prefix}_${++cardSeq}`; }
 
 // ─── Equation generators by difficulty ───────────────────────────────────────
-// difficulty: 1 = easy, 2 = medium, 3 = hard
+// difficulty: 1-2 = easy (same math; 2 adds a timer), 3 = medium, 4 = hard, 5 = expert
 function makeEq(difficulty) {
-  if (difficulty === 1) {
+  const d = Math.min(5, Math.max(1, Number(difficulty) || 1));
+  if (d <= 2) {
     const a = rand(1, 9), b = rand(1, 9);
     return { eq: `${a}+${b}`, answer: a + b };
   }
-  if (difficulty === 2) {
-    const type = rand(0, 1);
-    if (type === 0) {
-      const a = rand(5, 20), b = rand(5, 20);
-      return { eq: `${a}+${b}`, answer: a + b };
-    } else {
-      const a = rand(2, 5), b = rand(2, 9);
-      return { eq: `${a}×${b}`, answer: a * b };
-    }
-  }
-  // hard
-  const type = rand(0, 2);
-  if (type === 0) {
-    const a = rand(10, 50), b = rand(10, 50);
-    return { eq: `${a}+${b}`, answer: a + b };
-  }
-  if (type === 1) {
-    const a = rand(5, 12), b = rand(5, 12);
+  if (d === 3) {
+    const type = rand(0, 2);
+    if (type === 0) { const a = rand(5, 20), b = rand(5, 20); return { eq: `${a}+${b}`, answer: a + b }; }
+    if (type === 1) { const a = rand(6, 20), b = rand(1, a - 1); return { eq: `${a}−${b}`, answer: a - b }; }
+    const a = rand(2, 5), b = rand(2, 9);
     return { eq: `${a}×${b}`, answer: a * b };
   }
+  if (d === 4) {
+    const type = rand(0, 2);
+    if (type === 0) { const a = rand(10, 50), b = rand(10, 50); return { eq: `${a}+${b}`, answer: a + b }; }
+    if (type === 1) { const a = rand(10, 30), b = rand(2, a - 1); return { eq: `${a}−${b}`, answer: a - b }; }
+    const a = rand(2, 10), b = rand(2, 10);
+    return { eq: `${a}×${b}`, answer: a * b };
+  }
+  // expert
+  const type = rand(0, 2);
+  if (type === 0) { const a = rand(10, 50), b = rand(10, 50); return { eq: `${a}+${b}`, answer: a + b }; }
+  if (type === 1) { const a = rand(5, 12), b = rand(5, 12); return { eq: `${a}×${b}`, answer: a * b }; }
   const a = rand(10, 30), b = rand(2, 9);
   return { eq: `${a}−${b}`, answer: a - b };
 }

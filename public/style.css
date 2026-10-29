@@ -678,6 +678,24 @@ html, body {
   line-height: 1.5;
 }
 
+/* ─── Reconnect banner + waiting overlay ───────────────────────────────────── */
+.conn-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9999;
+  padding: 10px 16px;
+  text-align: center;
+  font-family: 'Cinzel', serif;
+  font-size: var(--fs-sm);
+  color: #1a1206;
+  background: linear-gradient(180deg, #f3c860, #c99a2e);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.5);
+  animation: conn-pulse 1.4s ease-in-out infinite;
+}
+@keyframes conn-pulse { 50% { opacity: 0.75; } }
+.wait-title { color: #f3c860; text-shadow: 0 0 18px rgba(243,200,96,0.5); text-align: center; }
+.wait-countdown { font-variant-numeric: tabular-nums; opacity: 0.8; }
+
 /* ─── Empty pile (greyed out) ───────────────────────────────────────────────── */
 .pile-card.pile-empty {
   opacity: 0.35;

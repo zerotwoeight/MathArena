@@ -53,6 +53,8 @@
           <div class="diff-star on" data-v="1">⭐</div>
           <div class="diff-star"    data-v="2">⭐</div>
           <div class="diff-star"    data-v="3">⭐</div>
+          <div class="diff-star"    data-v="4">⭐</div>
+          <div class="diff-star"    data-v="5">⭐</div>
         </div>
         <div class="diff-level" id="host-diff-label">Easy: No timer</div>
       </div>
@@ -106,6 +108,8 @@
           <div class="diff-star on" data-v="1">⭐</div>
           <div class="diff-star"    data-v="2">⭐</div>
           <div class="diff-star"    data-v="3">⭐</div>
+          <div class="diff-star"    data-v="4">⭐</div>
+          <div class="diff-star"    data-v="5">⭐</div>
         </div>
         <div class="diff-level" id="client-diff-label">Easy: No timer</div>
       </div>
@@ -279,7 +283,7 @@
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
 // Version: bump this AND "version" in package.json together.
-const CLIENT_VERSION = '1.6.1';
+const CLIENT_VERSION = '1.7.0';
 const socket = io();
 let myPlayerId = null;
 let myDifficulty = 1;
@@ -676,12 +680,12 @@ async function playFx({ actor, fx }) {
 //  Files: /img/<id>_<mood>.png  (normal, attack, correct, wrong, worried, shopping)
 //  To add an avatar: drop the 6 files in public/img and put its id in a slot below.
 // ═══════════════════════════════════════════════════════════════════════════
-const AVATAR_SLOTS = ['avatar1', 'avatar2', 'avatar3', 'avatar4'];   // null = "Coming soon"
+const AVATAR_SLOTS = ['avatar1', 'avatar2', 'avatar3', 'avatar4', 'avatar5'];   // null = "Coming soon"
 const MOOD_LIST = ['normal', 'attack', 'correct', 'wrong', 'worried', 'shopping'];
 // Avatars listed here use animated WebPs from /img/anim/ instead of the still PNGs.
 // (WebPs are converted from the GIFs: same look, about 1/3 the size.)
 // Remove an id from this list to switch that avatar back to stills.
-const ANIMATED_AVATARS = ['avatar1', 'avatar2', 'avatar3', 'avatar4'];
+const ANIMATED_AVATARS = ['avatar1', 'avatar2', 'avatar3', 'avatar4', 'avatar5'];
 let animFailed = false;   // set if this iPad can't show animated WebP → stills from then on
 const avatarSrc = (id, mood = 'normal') => (ANIMATED_AVATARS.includes(id) && !animFailed)
   ? `/img/anim/${id}_${mood}.webp`
@@ -1058,7 +1062,8 @@ function toast(message, type = 'info') {
 }
 
 // ─── Difficulty stars ────────────────────────────────────────────────────────
-const DIFF_LABELS = ['', 'Easy: No timer', 'Medium: 10 seconds', 'Hard: 5 seconds'];
+const DIFF_LABELS = ['', 'Easy: No timer', 'Easy+: 20 seconds', 'Medium: 15 seconds', 'Hard: 10 seconds', 'Expert: 5 seconds'];
+const DIFF_SECONDS = [0, 0, 20, 15, 10, 5];
 
 function initDiffStars(wrapId, labelId, onChange) {
   const wrap = document.getElementById(wrapId);
@@ -1457,21 +1462,104 @@ async function showGameOver(winner) {
   }
 }
 
-socket.on('opponent_disconnected', ({ name } = {}) => {
+// ═══════════════════════════════════════════════════════════════════════════
+//  RECONNECT
+//  The server gives this device a session key for its seat. If the connection
+//  drops (phone screen locks, app switch, weak wifi) we reconnect and rejoin
+//  with that key; the game waits up to 10 minutes for us.
+// ═══════════════════════════════════════════════════════════════════════════
+const SESSION_KEY = 'mcg-session';
+function loadSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'); } catch (e) { return null; } }
+function saveSession(s) { try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)); } catch (e) {} }
+function clearSession() { try { localStorage.removeItem(SESSION_KEY); } catch (e) {} }
+let oppAway = false;
+
+socket.on('session', ({ roomCode, playerId, sessionKey }) => saveSession({ roomCode, playerId, sessionKey }));
+
+// Every (re)connect: if this device holds a seat, ask for it back
+socket.on('connect', () => {
+  const sess = loadSession();
+  if (sess) socket.emit('rejoin', sess);
+  else hideConnBanner();
+});
+
+socket.on('rejoined', ({ playerId }) => {
+  myPlayerId = playerId;
+  hideConnBanner();
+  document.getElementById('disconnect-overlay')?.remove();
+});
+
+socket.on('session_expired', ({ reason } = {}) => {
+  clearSession();
+  hideConnBanner();
   stopTimer();
-  if (document.getElementById('s-gameover').classList.contains('active')) { opponentGone(name, 'disconnected'); return; }
-  showDisconnectOverlay('Opponent disconnected', 'They left the game. Return to the lobby to start a new game.');
+  const active = document.querySelector('.screen.active');
+  if (!active || active.id === 's-landing') return; // fresh page, nothing to say
+  showDisconnectOverlay('Game ended', reason && reason !== 'expired'
+    ? `${reason}. Return to the lobby to start a new game.`
+    : 'This game is no longer running. Return to the lobby to start a new game.');
 });
 
 socket.on('disconnect', () => {
-  // Only show overlay if we were mid-game (not on lobby screens)
-  const active = document.querySelector('.screen.active');
-  const lobbyIds = ['s-landing', 's-host-setup', 's-host-wait', 's-client-join', 's-client-wait'];
-  if (active && !lobbyIds.includes(active.id)) {
-    stopTimer();
-    showDisconnectOverlay('Connection lost', 'You were disconnected from the server.');
-  }
+  if (!loadSession()) return;          // not in a room, nothing to protect
+  stopTimer();
+  showConnBanner('Reconnecting…');
 });
+
+// Opponent's device dropped: pause and wait for them
+socket.on('opponent_away', ({ name, until } = {}) => {
+  oppAway = true;
+  stopTimer();
+  showWaitOverlay(name, until);
+});
+socket.on('opponent_back', ({ name } = {}) => {
+  oppAway = false;
+  hideWaitOverlay();
+  toast(`${name || 'Your opponent'} is back!`, 'success');
+  // An unanswered problem comes back from the server with a fresh timer
+});
+
+// Android pauses background tabs; when we come back to the front, reconnect now
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && !socket.connected && loadSession()) socket.connect();
+});
+window.addEventListener('pageshow', () => { if (!socket.connected && loadSession()) socket.connect(); });
+
+function showConnBanner(text) {
+  let b = document.getElementById('conn-banner');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = 'conn-banner';
+    b.className = 'conn-banner';
+    document.body.appendChild(b);
+  }
+  b.textContent = `⚡ ${text}`;
+}
+function hideConnBanner() { document.getElementById('conn-banner')?.remove(); }
+
+let waitTick = null;
+function showWaitOverlay(name, until) {
+  hideWaitOverlay();
+  const o = document.createElement('div');
+  o.id = 'wait-overlay';
+  o.className = 'disconnect-overlay';
+  o.innerHTML = `
+    <div class="disconnect-title wait-title">⏳ Waiting for ${name || 'your opponent'}</div>
+    <div class="disconnect-sub">Their device lost connection. The game is paused and will pick up right where it left off when they're back.</div>
+    <div class="disconnect-sub wait-countdown" id="wait-countdown"></div>`;
+  document.body.appendChild(o);
+  const tick = () => {
+    const left = Math.max(0, Math.round(((until || Date.now()) - Date.now()) / 1000));
+    const el = document.getElementById('wait-countdown');
+    if (el) el.textContent = `Game ends in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} if they don't return`;
+  };
+  tick();
+  waitTick = setInterval(tick, 1000);
+}
+function hideWaitOverlay() {
+  clearInterval(waitTick); waitTick = null;
+  document.getElementById('wait-overlay')?.remove();
+}
 
 function showDisconnectOverlay(title, sub) {
   // Remove any existing overlay
@@ -1488,7 +1576,7 @@ function showDisconnectOverlay(title, sub) {
 }
 
 socket.on('math_challenge', (challenge) => {
-  queueFx(() => { pendingChallenge = challenge; showMathChallenge(challenge); });
+  queueFx(() => { endAwait(); pendingChallenge = challenge; showMathChallenge(challenge); });
 });
 
 // ─── Shield flash tracking ─────────────────────────────────────────────────────
@@ -2135,6 +2223,7 @@ function showMathChallenge(challenge) {
 
 function startTimer(barId, wrapId) {
   stopTimer();
+  if (oppAway) return; // paused; restarted when they're back
   const bar = document.getElementById(barId);
   const wrap = document.getElementById(wrapId);
 
@@ -2143,7 +2232,7 @@ function startTimer(barId, wrapId) {
     return;
   }
   wrap.style.display = '';
-  timerSeconds = myDifficulty === 2 ? 10 : 5;
+  timerSeconds = DIFF_SECONDS[myDifficulty] || 5;
 
   bar.style.transition = 'none';
   bar.style.width = '100%';
@@ -2237,6 +2326,7 @@ function requestRematch() {
   socket.emit('rematch_request');
 }
 function leaveRoom() {
+  clearSession();
   socket.emit('leave_room');
   setTimeout(() => location.reload(), 150);
 }
@@ -2256,6 +2346,7 @@ socket.on('rematch_status', ({ ready }) => {
   }
 });
 socket.on('opponent_left', ({ name }) => queueFx(() => {
+  clearSession(); hideWaitOverlay();
   if (document.getElementById('s-gameover').classList.contains('active')) opponentGone(name, 'left');
   else showDisconnectOverlay('Opponent left', `${name || 'Your opponent'} left the game.`);
 }));
