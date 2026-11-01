@@ -1299,3 +1299,7 @@ html, body {
 @media (orientation: landscape) and (max-height: 900px) {
   .math-modal-inner > .math-big-card { width: min(40vh, 300px); width: min(40dvh, 300px); }
 }
+
+/* Ko-fi link on landing screen (matches Summoner's Gambit) */
+.kofi-corner{font-family:'Cinzel',serif;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-hi);text-decoration:none;transition:opacity .2s;opacity:.85;}
+.kofi-corner:hover{opacity:1;}
