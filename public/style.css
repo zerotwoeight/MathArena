@@ -900,6 +900,31 @@ html, body {
 /* Leave room for the mute button in the HUD */
 .game-hud { padding-right: calc(var(--pad-h) + clamp(34px, 9vw, 50px)); }
 
+/* Quit button (top-left, mirrors the mute button). Only shown during a game. */
+.quit-btn {
+  position: fixed; top: 6px; left: 6px; z-index: 9997;
+  width: clamp(30px, 8vw, 44px); height: clamp(30px, 8vw, 44px);
+  border-radius: 50%; border: 1px solid var(--rim-hi);
+  background: rgba(15,19,32,0.85); color: var(--text);
+  font-size: clamp(14px, 4vw, 20px); cursor: pointer;
+  display: none; align-items: center; justify-content: center;
+}
+body.in-game .quit-btn { display: flex; }
+body.in-game .game-hud { padding-left: calc(var(--pad-h) + clamp(34px, 9vw, 50px)); }
+body.in-game .wait-screen { padding-top: calc(clamp(16px,5vw,28px) + clamp(30px, 8vw, 44px)); }
+
+/* Are-you-sure box: sits above every other overlay */
+.confirm-overlay { z-index: 10001; background: rgba(4,5,8,0.985); }
+.confirm-row { display: flex; gap: 12px; }
+.confirm-row .btn { min-width: 120px; white-space: nowrap; }
+
+/* Return to Lobby button inside the reconnecting banner */
+.conn-banner .conn-leave {
+  margin-left: 12px; padding: 4px 12px; border-radius: 8px;
+  border: 1px solid #1a1206; background: rgba(255,255,255,0.35);
+  color: #1a1206; font: inherit; font-weight: 700; cursor: pointer;
+}
+
 /* Upgraded shield build: drops in from above with a bounce */
 @keyframes shield-build {
   0%   { transform: translateY(-60px) scale(1.2); opacity: 0; }
@@ -1303,3 +1328,175 @@ html, body {
 /* Ko-fi link on landing screen (matches Summoner's Gambit) */
 .kofi-corner{font-family:'Cinzel',serif;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold-hi);text-decoration:none;transition:opacity .2s;opacity:.85;}
 .kofi-corner:hover{opacity:1;}
+
+/* ═══ Solo vs Kaiju (v1.8.0) ══════════════════════════════════════════════ */
+.btn-solo {
+  background: linear-gradient(180deg, #2d6a3a, #17401f); color: #e6ffe9;
+  border: 2px solid #6effa0; box-shadow: 0 0 14px rgba(110,255,160,0.25);
+}
+.btn-solo:hover { filter: brightness(1.12); }
+
+.solo-setup-wrap {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  min-height: 100%; gap: clamp(12px, 3.5vw, 20px); padding: clamp(16px, 5vw, 28px);
+  overflow-y: auto;
+}
+#s-solo-setup { overflow-y: auto; }
+
+/* Ladder of 3 kaiju */
+.boss-ladder { display: flex; gap: clamp(8px, 2.5vw, 14px); justify-content: center; width: 100%; }
+.boss-card {
+  position: relative; flex: 1 1 0; min-width: 0; max-width: 150px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 10px 6px 12px; border-radius: 14px; cursor: pointer;
+  background: var(--surface2); border: 2px solid var(--boss-c, var(--rim-hi));
+  box-shadow: 0 0 14px var(--boss-glow, transparent);
+  color: var(--text); font: inherit; transition: transform 0.15s;
+}
+.boss-card:hover { transform: translateY(-3px); }
+.boss-card.locked { opacity: 0.45; filter: grayscale(0.8); cursor: default; transform: none; }
+.boss-card-name { font-family: 'Cinzel', serif; font-weight: 900; font-size: var(--fs-sm); color: var(--boss-c); }
+.boss-card-info { font-size: var(--fs-xs); color: var(--text-dim); text-align: center; line-height: 1.25; }
+.boss-card-check {
+  position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--green); color: #fff; font-weight: 900; display: grid; place-items: center; font-size: 14px;
+}
+
+/* Kaiju colors */
+[data-boss="grey"] { --boss-c: #b8bcc4; --boss-glow: rgba(184,188,196,0.35); --boss-hue: grayscale(1) brightness(1.1); }
+[data-boss="blue"] { --boss-c: #6f9bff; --boss-glow: rgba(79,123,255,0.45);  --boss-hue: hue-rotate(110deg) saturate(1.4); }
+[data-boss="red"]  { --boss-c: #ff4757; --boss-glow: rgba(255,71,87,0.5);    --boss-hue: hue-rotate(-100deg) saturate(1.8); }
+
+/* Kaiju portrait: art if present, tinted 🦖 placeholder underneath */
+.avatar-portrait.boss-portrait {
+  position: relative; background: radial-gradient(circle at 50% 40%, #2a2f3a, #10131a);
+  border-color: var(--boss-c, var(--gold)); box-shadow: 0 0 16px var(--boss-glow, transparent), 0 4px 10px rgba(0,0,0,0.5);
+  display: grid; place-items: center;
+}
+.boss-portrait .boss-ph {
+  width: 100%; height: 100%; display: grid; place-items: center; line-height: 1;
+  filter: var(--boss-hue, none);
+}
+.boss-portrait { font-size: clamp(30px, 9vw, 60px); }
+.avatar-portrait.sm.boss-portrait { font-size: clamp(26px, 7vw, 46px); }
+.avatar-portrait.lg.boss-portrait, .avatar-portrait.xl.boss-portrait { font-size: clamp(60px, 18vw, 120px); }
+.boss-portrait img { position: absolute; inset: 0; }
+.boss-portrait[data-mood="hurt"] .boss-ph { filter: var(--boss-hue, none) sepia(0.6) saturate(3) hue-rotate(-30deg); }
+.boss-portrait[data-mood="heal"] .boss-ph { filter: var(--boss-hue, none) drop-shadow(0 0 12px #6effa0); }
+.boss-portrait[data-mood="raid"] .boss-ph { filter: var(--boss-hue, none) drop-shadow(0 0 12px #e8c84e); }
+.boss-portrait[data-mood="attack"] .boss-ph { filter: var(--boss-hue, none) drop-shadow(0 0 14px #ff4757); }
+.boss-portrait[data-mood="defeated"] .boss-ph { filter: grayscale(1) brightness(0.6); }
+
+/* Health bar */
+.boss-hp {
+  position: relative; width: min(86vw, 420px); height: clamp(20px, 3.4vh, 28px); margin: 2px auto 6px;
+  border-radius: 999px; background: #1a0d10; border: 2px solid var(--boss-c, var(--red));
+  overflow: hidden; box-shadow: 0 0 12px var(--boss-glow, transparent), inset 0 2px 6px rgba(0,0,0,0.6);
+}
+.boss-hp.hidden { display: none; }
+.boss-hp-fill {
+  position: absolute; inset: 0 auto 0 0; width: 100%;
+  background: linear-gradient(180deg, #ff6b78, #b01e2c); transition: width 0.6s cubic-bezier(.3,1.2,.5,1);
+}
+.boss-hp.low .boss-hp-fill { animation: hp-low 0.8s ease-in-out infinite; }
+@keyframes hp-low { 50% { filter: brightness(1.6); } }
+.boss-hp-text {
+  position: relative; text-align: center; line-height: clamp(16px, 3vh, 24px);
+  font-family: 'Exo 2', sans-serif; font-weight: 800; font-size: var(--fs-sm); color: #fff;
+  text-shadow: 0 1px 3px #000;
+}
+
+/* Raid pop-up title */
+.math-title {
+  font-family: 'Cinzel', serif; font-weight: 900; font-size: var(--fs-lg); color: #ff8a95;
+  text-align: center; text-shadow: 0 0 12px rgba(176,30,44,0.8); letter-spacing: 0.04em;
+}
+.math-title.hidden { display: none; }
+
+/* Shop pile the kaiju raided */
+.pile-card.pile-raided { filter: grayscale(1) brightness(0.55); cursor: not-allowed; position: relative; }
+.pile-card.pile-raided:hover { transform: none; }
+.raided-tag {
+  position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%) rotate(-14deg);
+  background: var(--red); color: #fff; font-family: 'Cinzel', serif; font-weight: 900;
+  font-size: max(12px, 12cqw); padding: 4px 10px; border-radius: 6px; border: 2px solid #ff8a95;
+  white-space: nowrap; z-index: 3;
+}
+
+.buff-badge.glass { color: #f1e6ff; background: #5a2db0; border: 1px solid #c39bff; }
+
+/* Damage / heal numbers */
+.dmg-pop {
+  position: fixed; z-index: 9999; pointer-events: none;
+  font-family: 'Exo 2', sans-serif; font-weight: 900; font-size: clamp(34px, 9vw, 64px);
+  text-shadow: 0 3px 0 #000, 0 0 16px rgba(0,0,0,0.6);
+}
+
+/* ─── Kaiju full-screen moments (solo) ─────────────────────────────────────── */
+/* Cut-in: boss attack / heal / raid fills the screen for BOSS_CUTIN_MS, tap skips.
+   The sharp art is capped at its native size (--kaiju-max) so it never stretches soft;
+   a blurred copy of the same loop fills the rest of the screen. */
+:root { --kaiju-max: 384px; }
+.kaiju-blur {
+  position: absolute; inset: -40px; width: calc(100% + 80px); height: calc(100% + 80px);
+  object-fit: cover; filter: blur(28px) brightness(0.55) saturate(1.1);
+  z-index: 0; pointer-events: none;
+}
+.kaiju-cutin {
+  position: fixed; inset: 0; z-index: 9000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: clamp(8px, 2vh, 18px);
+  background: radial-gradient(circle at 50% 50%, var(--boss-glow, rgba(0,0,0,0.4)) 0%, rgba(6,8,16,0.92) 70%);
+  opacity: 0; cursor: pointer;
+}
+.kaiju-cutin { overflow: hidden; }
+.kaiju-cutin > * { position: relative; z-index: 1; }
+.kaiju-cutin > .kaiju-blur { position: absolute; z-index: 0; }
+.kaiju-cutin img.kaiju-sharp {
+  width: min(90vw, 80vh, var(--kaiju-max)); height: min(90vw, 80vh, var(--kaiju-max)); object-fit: contain;
+  border-radius: 24px; border: 3px solid var(--boss-c, var(--gold));
+  box-shadow: 0 0 40px var(--boss-glow, transparent), 0 10px 30px rgba(0,0,0,0.6);
+  background: #fffaf2;
+}
+.kaiju-cutin-text {
+  font-family: 'Cinzel', serif; font-weight: 900; font-size: var(--fs-xl);
+  color: var(--boss-c, var(--gold)); text-align: center;
+  text-shadow: 0 2px 18px rgba(0,0,0,0.9), 0 0 12px var(--boss-glow, transparent);
+}
+
+/* Game over (solo): the kaiju loop is the background. First pass at full
+   brightness with only the title, then it dims and the buttons appear. */
+#s-gameover .kaiju-go-bg, #s-gameover .kaiju-blur { display: none; }
+#s-gameover.kaiju-go { overflow: hidden; }
+#s-gameover.kaiju-go .kaiju-blur { display: block; }
+#s-gameover.kaiju-go .kaiju-go-bg {
+  display: block; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(94vw, 94vh, var(--kaiju-max)); height: min(94vw, 94vh, var(--kaiju-max));
+  object-fit: contain; border-radius: 24px; z-index: 0;
+  box-shadow: 0 0 40px var(--boss-glow, transparent), 0 10px 30px rgba(0,0,0,0.6);
+  transition: filter 0.9s ease, opacity 0.9s ease;
+}
+#s-gameover.kaiju-go > div { position: relative; z-index: 1; }
+#s-gameover.kaiju-go.lose > div { animation: none; }
+#s-gameover.kaiju-go.intro .kaiju-go-bg { filter: none; }
+#s-gameover.kaiju-go:not(.intro) .kaiju-go-bg { filter: brightness(0.35) saturate(0.8); }
+#s-gameover.kaiju-go .gameover-panel {
+  background: rgba(15,19,32,0.82); border-color: var(--boss-c, var(--gold));
+  box-shadow: 0 0 30px var(--boss-glow, transparent);
+  transition: background 0.6s ease, border-color 0.6s ease;
+}
+#s-gameover.kaiju-go.intro { cursor: pointer; }
+#s-gameover.kaiju-go.intro > div { align-items: flex-start !important; }
+#s-gameover.kaiju-go.intro .gameover-panel { background: transparent; border-color: transparent; box-shadow: none; }
+#s-gameover.kaiju-go.intro .gameover-title,
+#s-gameover.kaiju-go.intro .gameover-sub { text-shadow: 0 2px 10px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.9); }
+#s-gameover.kaiju-go.intro .gameover-panel .btn,
+#s-gameover.kaiju-go.intro .rematch-status { visibility: hidden; opacity: 0; }
+#s-gameover.kaiju-go .gameover-panel .btn { transition: opacity 0.6s ease; }
+/* Dark band behind the title during the bright first pass, so it stays readable */
+#s-gameover.kaiju-go::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 38%; z-index: 1; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(6,8,16,0.88) 0%, rgba(6,8,16,0.55) 55%, transparent 100%);
+  transition: opacity 0.9s ease;
+}
+#s-gameover.kaiju-go:not(.intro)::before { opacity: 0; }

@@ -10,6 +10,7 @@
 
 <!-- ═══════════════════════════════════════════════════════ TOAST CONTAINER -->
 <div class="toast-wrap" id="toast-wrap"></div>
+<button class="quit-btn" id="quit-btn" onclick="askQuit()" aria-label="Quit game">✕</button>
 
 <!-- ═══════════════════════════════════════════════════════ SCREEN 1: LANDING -->
 <div id="s-landing" class="screen active">
@@ -21,6 +22,7 @@
     <div class="lobby-panel">
       <button class="btn btn-gold" onclick="showScreen('s-host-setup')">Create Game</button>
       <button class="btn btn-outline" onclick="showScreen('s-client-join')">Join Game</button>
+      <button class="btn btn-solo" onclick="openSoloSetup()">🦖 Solo vs Kaiju</button>
       <button class="htp-link" onclick="openHowTo()">📖 How to Play</button>
     </div>
     <a class="kofi-corner" href="https://ko-fi.com/fortyonethoughts" target="_blank" rel="noopener">☕ Buy me a coffee</a>
@@ -60,6 +62,31 @@
         <div class="diff-level" id="host-diff-label">Easy: No timer</div>
       </div>
       <button class="btn btn-gold" onclick="hostCreate()">Create Room</button>
+      <button class="btn btn-ghost" onclick="showScreen('s-landing')">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCREEN: SOLO SETUP -->
+<div id="s-solo-setup" class="screen">
+  <div class="solo-setup-wrap">
+    <div class="logo" style="font-size:var(--fs-xl);">🦖 Solo vs Kaiju</div>
+    <div class="lobby-panel">
+      <input id="solo-name" class="text-input" type="text" placeholder="Your name" maxlength="16" autocomplete="off">
+      <div class="avatar-pick-wrap"><div class="diff-label">Avatar</div><div class="avatar-picker"></div></div>
+      <div class="diff-wrap">
+        <div class="diff-label">Difficulty</div>
+        <div class="diff-stars" id="solo-diff-stars">
+          <div class="diff-star on" data-v="1">⭐</div>
+          <div class="diff-star"    data-v="2">⭐</div>
+          <div class="diff-star"    data-v="3">⭐</div>
+          <div class="diff-star"    data-v="4">⭐</div>
+          <div class="diff-star"    data-v="5">⭐</div>
+        </div>
+        <div class="diff-level" id="solo-diff-label">Easy: 20 seconds</div>
+      </div>
+      <div class="diff-label">Pick your kaiju</div>
+      <div class="boss-ladder" id="boss-ladder"></div>
       <button class="btn btn-ghost" onclick="showScreen('s-landing')">← Back</button>
     </div>
   </div>
@@ -164,6 +191,7 @@
         <div class="avatar-portrait sm" id="game-opp-avatar"></div>
         <div class="zone-label" id="enemy-name-label">Enemy Shields</div>
       </div>
+      <div class="boss-hp hidden" id="boss-hp"><div class="boss-hp-fill"></div><div class="boss-hp-text"></div></div>
       <div class="shield-row" id="enemy-shields"></div>
       <!-- Final strike target: shown on your turn once all enemy shields are gone.
            The opponent's portrait becomes the target (drag or tap). Keeps the old id
@@ -209,6 +237,7 @@
 <div id="s-math" class="screen math-modal-screen">
   <div class="modal-scrim"></div>
   <div class="math-modal-inner" id="math-modal-inner">
+    <div class="math-title hidden" id="math-title"></div>
     <div class="math-big-card art-card atk" id="math-card"></div>
     <div class="timer-bar-wrap" id="timer-wrap">
       <div class="timer-bar" id="timer-bar"></div>
@@ -250,9 +279,10 @@
     <div class="wait-enemy-section">
       <div class="avatar-portrait lg" id="wait-enemy-avatar"></div>
       <div class="wait-name" id="wait-enemy-name">Opponent</div>
+      <div class="boss-hp hidden" id="wait-boss-hp"><div class="boss-hp-fill"></div><div class="boss-hp-text"></div></div>
       <div class="wait-badge">
         <div class="wait-dot"></div>
-        Their Turn
+        <span id="wait-badge-text">Their Turn</span>
       </div>
     </div>
     <div class="wait-shields-section">
@@ -268,12 +298,15 @@
 
 <!-- ═══════════════════════════════════════════════════════ SCREEN 11: GAME OVER -->
 <div id="s-gameover" class="screen">
+  <img class="kaiju-blur" id="kaiju-go-blur" alt="">
+  <img class="kaiju-go-bg" id="kaiju-go-bg" alt="">
   <div style="display:flex;align-items:center;justify-content:center;height:100%;padding:clamp(16px,5vw,28px);">
     <div class="gameover-panel">
       <div class="gameover-title" id="gameover-title">Victory!</div>
       <div class="gameover-sub" id="gameover-sub">You defeated your opponent!</div>
       <div class="rematch-status" id="rematch-status"></div>
       <button class="btn btn-gold" id="rematch-btn" onclick="requestRematch()">⚔️ Rematch</button>
+      <button class="btn btn-outline hidden" id="retry-btn" onclick="soloRestart(soloLevel)">↻ Fight Again</button>
       <button class="btn btn-ghost" id="leave-btn" onclick="leaveRoom()">Leave</button>
     </div>
   </div>
@@ -284,7 +317,7 @@
 <script>
 // ─── State ──────────────────────────────────────────────────────────────────
 // Version: bump this AND "version" in package.json together.
-const CLIENT_VERSION = '1.7.0';
+const CLIENT_VERSION = '1.8.0';
 const socket = io();
 let myPlayerId = null;
 let myDifficulty = 1;
@@ -301,6 +334,16 @@ const SFX = (() => {
     select: 'cardSelect', submit: 'Submit', positive: 'Positive', negative: 'Negitive',
     sword: 'Hit-Sword', gun: 'Hit-Gun', hammer: 'Hit-Hammer', shieldBreak: 'ShieldBreak',
   };
+  // Sound pass (Nov 2026): one file per moment, aud/sfx_<key>.mp3
+  ['boss_roar','boss_slam','boss_charged','boss_hurt','crit','boss_heal','boss_raid','boss_ko','boss_defeat',
+   'chest_wood','chest_iron','chest_gold','potion','poison','purple_safe','looking_glass','steal','red_book','armory','potion_lost',
+   'throw','deflect','final_hit','build_wood','build_stone','build_gem',
+   'correct','wrong','tick','numpad','your_turn','card_swish','joined','win','lose',
+  ].forEach(k => { files[k] = 'sfx_' + k; });
+  // Sounds that keep their exact pitch (musical stingers / voices)
+  const NO_JITTER = new Set(['correct', 'wrong', 'win', 'lose', 'your_turn', 'joined', 'boss_defeat', 'tick']);
+  const MAX_SAME = 3;
+  const live = {};
   const AC = window.AudioContext || window.webkitAudioContext;
   const ctx = AC ? new AC() : null;
   const buffers = {};
@@ -329,8 +372,13 @@ const SFX = (() => {
   function play(key, volume = 1) {
     if (muted) return;
     if (ctx && buffers[key]) {
+      live[key] = live[key] || 0;
+      if (live[key] >= MAX_SAME) return; // don't stack the same sound into mush
       const src = ctx.createBufferSource();
       src.buffer = buffers[key];
+      if (!NO_JITTER.has(key)) src.playbackRate.value = 0.95 + Math.random() * 0.1; // ±5% so repeats don't sound robotic
+      live[key]++;
+      src.onended = () => { live[key]--; };
       const gain = ctx.createGain();
       gain.gain.value = volume;
       src.connect(gain);
@@ -459,6 +507,7 @@ function makeProjectile(icon, fromTop, img) {
 }
 async function flyProjectile(proj, tx, ty) {
   const dx = tx - proj.sx, dy = ty - proj.sy;
+  SFX.play('throw', 0.8);
   await anim(proj.el, [
     { transform: 'translate(-50%,-50%) scale(0.6) rotate(0deg)', opacity: 0.4 },
     { transform: `translate(calc(-50% + ${dx * 0.5}px), calc(-50% + ${dy * 0.5 - 60}px)) scale(1.3) rotate(-200deg)`, opacity: 1, offset: 0.5 },
@@ -509,7 +558,8 @@ async function fxBlocked(shieldEl, fx, fromTop) {
   const { x, y } = centerOf(shieldEl);
   const proj = makeProjectile(fx.cardIcon, fromTop, IMG[fx.cardSub]);
   const { dx, dy } = await flyProjectile(proj, x, y);
-  SFX.play(WEAPON_SFX[fx.cardSub] || 'sword');
+  SFX.play(WEAPON_SFX[fx.cardSub] || 'sword', 0.5);
+  SFX.play('deflect');
   burst(x, y, { count: 8, colors: ['#cfd6e0', '#ffffff'], dist: [20, 60], dur: 300 });
   // Shield holds firm — a stubborn little shudder + steel glint
   anim(shieldEl, [
@@ -544,7 +594,12 @@ async function fxDirect(fx, mine) {
   await flyProjectile(proj, target.x, target.y);
   proj.el.remove();
   SFX.play(WEAPON_SFX[fx.cardSub] || 'sword');
-  SFX.play('shieldBreak');
+  if (fx.kind === 'boss_hit') {
+    SFX.play('boss_ko');
+    setTimeout(() => SFX.play('boss_defeat', 0.9), 450);
+  } else {
+    SFX.play('final_hit');
+  }
   screenFlash(mine ? 'rgba(232,200,78,0.55)' : 'rgba(176,30,44,0.6)', 600);
   screenShake(18, 700);
   burst(target.x, target.y, { count: 40, dist: [80, 280], dur: 1000 });
@@ -601,7 +656,7 @@ async function fxAnswerResult(fx) {
   const { cardEl } = a;
   const { x, y } = centerOf(cardEl);
   if (fx.kind !== 'wrong') {
-    SFX.play('positive');
+    SFX.play('correct');
     burst(x, y, { count: 26, dist: [90, 240], dur: 900 });
     burst(x, y, { count: 8, text: '✦', colors: ['#e8c84e', '#fff6c0'], size: [8, 14], dist: [70, 200], dur: 1000 });
     await anim(cardEl, [
@@ -610,7 +665,7 @@ async function fxAnswerResult(fx) {
       { transform: 'scale(1.5)', opacity: 0, filter: 'brightness(2.2)', boxShadow: '0 0 80px rgba(232,200,78,0)' },
     ], { duration: 700, easing: 'ease-out', fill: 'forwards' });
   } else {
-    SFX.play('negative');
+    SFX.play('wrong');
     screenFlash('rgba(176,30,44,0.35)', 400);
     await anim(cardEl, [
       { transform: 'translateX(0) rotate(0)', opacity: 1, filter: 'none' },
@@ -648,7 +703,9 @@ async function playFx({ actor, fx }) {
   if (!fx) return;
   const mine = actor === myPlayerId;
   moodFromFx(fx, mine);
-  if (mine && awaiting) await fxAnswerResult(fx);
+  if ((mine || fx.raid) && awaiting) await fxAnswerResult(fx);
+  if (fx.raid === 'lost') { setBossMood('raid'); showTurnBanner(fx.gain === 'charge' ? '⚡ KAIJU CHARGED UP!' : '💚 KAIJU HEALED!', true); await wait(600); return; }
+  if (fx.kind && fx.kind.startsWith('boss_')) { await fxBoss(fx); return; }
   if (mine && lastDirect && fx.kind === 'wrong') {
     const face = document.getElementById('final-opp-avatar');
     if (face && face.offsetParent) { await wait(80); await fxBlocked(face, lastDirect, false); }
@@ -734,6 +791,8 @@ document.addEventListener('DOMContentLoaded', () => { buildAvatarPickers(); prel
 // Put a portrait image in a frame; pop it when the face changes
 function setPortrait(el, id, mood, pop) {
   if (!el) return;
+  if (String(id).startsWith('boss')) return setBossPortrait(el, id, mood, pop);
+  el.classList.remove('boss-portrait');
   let img = el.querySelector('img');
   if (!img) { el.innerHTML = '<img alt="">'; img = el.querySelector('img'); }
   const src = avatarSrc(id, mood);
@@ -796,7 +855,7 @@ function moodFromFx(fx, mine) {
     else if (fx.kind === 'smash' || fx.kind === 'direct') setMyMood('attack');
     else if (fx.lostShields?.length) setMyMood('worried', 2600);
     else if (['correct', 'built', 'wild'].includes(fx.kind)) setMyMood('correct');
-  } else if (fx.kind === 'smash' || fx.kind === 'direct' || (fx.kind === 'wild' && fx.stolen)) {
+  } else if (fx.kind === 'smash' || fx.kind === 'direct' || fx.kind === 'boss_attack' || (fx.kind === 'wild' && fx.stolen)) {
     setMyMood('worried', 2600);                 // they hit my shield or stole my cards
   }
 }
@@ -902,7 +961,7 @@ async function fxWild(fx, mine, actor) {
     let text = `${who}: ${fx.icon} ${fx.name}`;
     if (fx.effect === 'looking_glass' && fx.stolen) {
       text = `🔮 ${who} stole ${fx.stolen} of your cards!`;
-      SFX.play('negative');
+      SFX.play('steal');
       screenFlash('rgba(110,40,200,0.35)', 500);
     }
     showTurnBanner(text, true);
@@ -911,13 +970,18 @@ async function fxWild(fx, mine, actor) {
   }
 
   const cx = window.innerWidth / 2, cy = window.innerHeight * 0.42;
+  const WILD_SFX = {
+    wooden_chest: 'chest_wood', iron_chest: 'chest_iron', gold_chest: 'chest_gold', armory: 'armory',
+    looking_glass: 'looking_glass', red_potion: 'potion', red_spellbook: 'red_book', poison_drink: 'poison',
+  };
+  const wildSnd = fx.effect === 'purple_potion' ? (fx.safe ? 'purple_safe' : 'poison') : WILD_SFX[fx.effect];
+  if (wildSnd) SFX.play(wildSnd);
   if (look.flash) screenFlash(look.flash, 600);
   const pop = iconPop(fx.icon, look.glow, IMG[fx.effect]);
   burst(cx, cy, { count: 30, colors: look.colors, dist: [90, 260], dur: 1000 });
   burst(cx, cy, { count: 10, text: '✦', colors: look.colors, size: [8, 14], dist: [80, 220], dur: 1100 });
 
   if (fx.effect === 'poison_drink' || (fx.effect === 'purple_potion' && !fx.safe)) {
-    SFX.play('negative', 0.7);
     // Toxic haze rolls over your shields; the shield-break plays when the board updates
     const own = document.getElementById('own-shields');
     if (own && !REDUCED_MOTION) {
@@ -933,10 +997,6 @@ async function fxWild(fx, mine, actor) {
       ], { duration: 900, delay: i * 120 }));
   } else if (fx.effect === 'iron_chest') {
     showTurnBanner('+1 ACTION!', true);
-  } else if (fx.effect === 'red_potion') {
-    SFX.play('positive', 0.6);
-  } else if (fx.effect === 'red_spellbook') {
-    SFX.play('positive', 0.6);
   } else if (fx.handFull) {
     toast('Your hand is full!', 'info');
   }
@@ -950,7 +1010,7 @@ async function fxPotionLost() {
   d.className = 'fx-icon-pop';
   d.innerHTML = `<img src="${IMG.red_potion}" alt="">`;
   document.body.appendChild(d);
-  SFX.play('shieldBreak', 0.7);
+  SFX.play('potion_lost');
   await anim(d, [
     { transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0, filter: 'drop-shadow(0 0 30px rgba(255,40,60,1))' },
     { transform: 'translate(-50%,-50%) scale(1.2) rotate(-8deg)', opacity: 1, offset: 0.3 },
@@ -1011,7 +1071,7 @@ function showTurnBanner(text, small) {
   b.className = 'turn-banner' + (small ? ' small' : '');
   b.textContent = text;
   document.body.appendChild(b);
-  SFX.play('select');
+  SFX.play(small ? 'card_swish' : 'your_turn', small ? 0.8 : 1);
   (async () => {
     await anim(b, [
       { transform: 'translateX(-110%) skewX(-12deg)', opacity: 0 },
@@ -1050,6 +1110,34 @@ function confetti() {
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id)?.classList.add('active');
+  // Quit ✕ only shows during a game (your turn, their turn, shop)
+  document.body.classList.toggle('in-game', ['s-game', 's-waiting', 's-shop'].includes(id));
+}
+
+// ─── Are-you-sure box ───────────────────────────────────────────────────────
+function confirmBox(title, sub, yesLabel, onYes) {
+  document.getElementById('confirm-overlay')?.remove();
+  const o = document.createElement('div');
+  o.id = 'confirm-overlay';
+  o.className = 'disconnect-overlay confirm-overlay';
+  o.innerHTML = `
+    <div class="disconnect-title">${title}</div>
+    <div class="disconnect-sub">${sub}</div>
+    <div class="confirm-row">
+      <button class="btn btn-ghost" id="confirm-no">No</button>
+      <button class="btn btn-gold"  id="confirm-yes">${yesLabel}</button>
+    </div>`;
+  document.body.appendChild(o);
+  o.querySelector('#confirm-no').onclick  = () => o.remove();
+  o.querySelector('#confirm-yes').onclick = () => { o.remove(); onYes(); };
+}
+
+// ✕ during a game: leave for good (the other player is told right away)
+function askQuit() {
+  const solo = gameState?.mode === 'solo';
+  confirmBox('Quit this game?',
+    solo ? 'The kaiju fight will end.' : `${oppName()} will be told you left.`,
+    'Yes, quit', leaveRoom);
 }
 
 // ─── Toast ───────────────────────────────────────────────────────────────────
@@ -1065,8 +1153,11 @@ function toast(message, type = 'info') {
 // ─── Difficulty stars ────────────────────────────────────────────────────────
 const DIFF_LABELS = ['', 'Easy: No timer', 'Easy+: 20 seconds', 'Medium: 15 seconds', 'Hard: 10 seconds', 'Expert: 5 seconds'];
 const DIFF_SECONDS = [0, 0, 20, 15, 10, 5];
+// Solo vs Kaiju has its own, more forgiving timers (same problems per star)
+const SOLO_LABELS  = ['', 'Easy: 20 seconds', 'Easy+: 15 seconds', 'Medium: 15 seconds', 'Hard: 10 seconds', 'Expert: 10 seconds'];
+const SOLO_SECONDS = [0, 20, 15, 15, 10, 10];
 
-function initDiffStars(wrapId, labelId, onChange) {
+function initDiffStars(wrapId, labelId, onChange, labels = DIFF_LABELS) {
   const wrap = document.getElementById(wrapId);
   const label = document.getElementById(labelId);
   let current = 1;
@@ -1074,15 +1165,16 @@ function initDiffStars(wrapId, labelId, onChange) {
     star.addEventListener('click', () => {
       current = Number(star.dataset.v);
       wrap.querySelectorAll('.diff-star').forEach(s => s.classList.toggle('on', Number(s.dataset.v) <= current));
-      label.textContent = DIFF_LABELS[current];
+      label.textContent = labels[current];
       onChange(current);
     });
   });
   return () => current;
 }
 
-let getHostDiff, getClientDiff;
+let getHostDiff, getClientDiff, getSoloDiff;
 document.addEventListener('DOMContentLoaded', () => {
+  getSoloDiff   = initDiffStars('solo-diff-stars',   'solo-diff-label',   d => {}, SOLO_LABELS);
   getHostDiff   = initDiffStars('host-diff-stars',   'host-diff-label',   d => {});
   getClientDiff = initDiffStars('client-diff-stars', 'client-diff-label', d => {});
 });
@@ -1392,6 +1484,7 @@ socket.on('player_joined', ({ p2Name, p2Avatar }) => {
   document.getElementById('host-join-info').classList.add('hidden');
   document.getElementById('host-wait-title').textContent = 'Ready to Battle!';
   toast(`${p2Name} joined the room!`, 'success');
+  SFX.play('joined');
 });
 
 socket.on('lobby_state', ({ roomCode, p1Name, p2Name, p1Diff, p2Diff, p1Avatar, p2Avatar }) => {
@@ -1436,6 +1529,7 @@ socket.on('game_over', ({ winner }) => queueFx(() => showGameOver(winner)));
 async function showGameOver(winner) {
   stopTimer();
   await wait(300);
+  if (gameState?.mode === 'solo') return showSoloGameOver(winner);
   const isWinner = winner === myPlayerId;
   const oppId = myPlayerId === 'p1' ? 'p2' : 'p1';
   const winnerName = gameState?.players?.[winner]?.name || 'Player';
@@ -1449,17 +1543,18 @@ async function showGameOver(winner) {
   const screen = document.getElementById('s-gameover');
   const panel = screen.querySelector('.gameover-panel');
   panel.classList.remove('win', 'lose');
-  screen.classList.remove('lose');
+  screen.classList.remove('lose', 'kaiju-go', 'intro');
+  screen.removeAttribute('data-boss');
   showScreen('s-gameover');
   if (isWinner) {
     panel.classList.add('win');
-    SFX.play('positive');
+    SFX.play('win');
     confetti();
     setTimeout(confetti, 1600);
   } else {
     panel.classList.add('lose');
     screen.classList.add('lose');
-    SFX.play('negative');
+    SFX.play('lose');
   }
 }
 
@@ -1484,8 +1579,9 @@ socket.on('connect', () => {
   else hideConnBanner();
 });
 
-socket.on('rejoined', ({ playerId }) => {
+socket.on('rejoined', ({ playerId, solo }) => {
   myPlayerId = playerId;
+  if (solo) soloLevel = solo.level;
   hideConnBanner();
   document.getElementById('disconnect-overlay')?.remove();
 });
@@ -1535,8 +1631,22 @@ function showConnBanner(text) {
     document.body.appendChild(b);
   }
   b.textContent = `⚡ ${text}`;
+  // Still not back after 15s: offer a way out
+  clearTimeout(connLeaveTimer);
+  connLeaveTimer = setTimeout(() => {
+    const banner = document.getElementById('conn-banner');
+    if (!banner || banner.querySelector('.conn-leave')) return;
+    const btn = document.createElement('button');
+    btn.className = 'conn-leave';
+    btn.textContent = 'Return to Lobby';
+    btn.onclick = () => confirmBox('Leave this game?',
+      "You won't be able to come back to this game.",
+      'Yes, leave', () => { clearSession(); location.reload(); });
+    banner.appendChild(btn);
+  }, 15000);
 }
-function hideConnBanner() { document.getElementById('conn-banner')?.remove(); }
+let connLeaveTimer = null;
+function hideConnBanner() { clearTimeout(connLeaveTimer); document.getElementById('conn-banner')?.remove(); }
 
 let waitTick = null;
 function showWaitOverlay(name, until) {
@@ -1547,8 +1657,12 @@ function showWaitOverlay(name, until) {
   o.innerHTML = `
     <div class="disconnect-title wait-title">⏳ Waiting for ${name || 'your opponent'}</div>
     <div class="disconnect-sub">Their device lost connection. The game is paused and will pick up right where it left off when they're back.</div>
-    <div class="disconnect-sub wait-countdown" id="wait-countdown"></div>`;
+    <div class="disconnect-sub wait-countdown" id="wait-countdown"></div>
+    <button class="btn btn-ghost" style="max-width:220px;" id="wait-leave">Return to Lobby</button>`;
   document.body.appendChild(o);
+  o.querySelector('#wait-leave').onclick = () => confirmBox('Leave this game?',
+    `The game ends for both players. ${name || 'Your opponent'} won't be able to come back to it.`,
+    'Yes, leave', leaveRoom);
   const tick = () => {
     const left = Math.max(0, Math.round(((until || Date.now()) - Date.now()) / 1000));
     const el = document.getElementById('wait-countdown');
@@ -1628,10 +1742,15 @@ function renderGame(state) {
   turnBadge.textContent = isMyTurn ? 'Your Turn' : `${opp.name}'s Turn`;
   turnBadge.className = `turn-badge${isMyTurn ? ' my-turn' : ''}`;
   document.getElementById('round-label').textContent = `Round ${state.round}`;
-  document.getElementById('enemy-name-label').textContent =
-    opp.shields.every(w => !w.active) ? `${opp.name} has no shields left!` : `${opp.name}'s Shields`;
+  const solo = state.mode === 'solo';
+  document.getElementById('enemy-name-label').textContent = solo
+    ? `${opp.name}${state.boss?.charged ? ' ⚡ Charged!' : ''}`
+    : opp.shields.every(w => !w.active) ? `${opp.name} has no shields left!` : `${opp.name}'s Shields`;
+  renderBossHp(state);
+  document.getElementById('wait-badge-text').textContent = solo ? `${opp.name}'s Turn` : 'Their Turn';
+  if (solo) document.querySelector('#direct-attack-banner .final-label').textContent = `Drag a weapon here! Weak to ${state.boss.weak}s`;
   if (opp.avatar && opp.avatar !== oppAvatar) { oppAvatar = opp.avatar; preloadAvatar(oppAvatar); }
-  ['game-opp-avatar', 'wait-enemy-avatar', 'final-opp-avatar'].forEach(id => setPortrait(document.getElementById(id), oppAvatar || 'avatar1', oppMood, false));
+  ['game-opp-avatar', 'wait-enemy-avatar', 'final-opp-avatar'].forEach(id => setPortrait(document.getElementById(id), oppAvatar || 'avatar1', solo ? bossMood : oppMood, false));
   if (!moodTimer && !moodHeld) emitMood(restMood());
 
   // Shields & hand
@@ -1666,8 +1785,9 @@ function renderGame(state) {
     hud.insertBefore(badges, document.getElementById('round-label'));
   }
   badges.innerHTML =
-    (eff.doublePower ? '<div class="buff-badge potion">🧪 Power Up</div>' : '') +
-    (eff.noMath ? '<div class="buff-badge book">📕 No Math</div>' : '');
+    (eff.doublePower ? `<div class="buff-badge potion">🧪 ${solo ? 'Double Damage' : 'Power Up'}</div>` : '') +
+    (eff.noMath ? '<div class="buff-badge book">📕 No Math</div>' : '') +
+    (solo && state.boss?.raidBlocked ? '<div class="buff-badge glass">🔮 Shop Guarded</div>' : '');
   document.getElementById('s-game').classList.toggle('buff-potion', !!eff.doublePower);
   document.getElementById('s-game').classList.toggle('buff-book', !!eff.noMath);
 
@@ -1750,6 +1870,7 @@ function renderShields(containerId, shields, interactive, mode) {
           shards(x, y, shield.type);
           screenShake(6, 350);
         } else {
+          SFX.play('build_' + String(shield.type || 'stone').toLowerCase());
           setTimeout(() => burst(x, y + r.height * 0.35, {
             count: 14, colors: ['#1e7a34', '#6effa0', '#c8f5d4'], dist: [30, 110], dur: 600, gravity: 20,
           }), 300);
@@ -2155,8 +2276,15 @@ function openShop() {
     const div = document.createElement('div');
     div.className = `card art-card ${p.color} pile-card`;
     div.innerHTML = cardFace('back', { tone: p.color, name: p.label });
+    if (gameState.lockedPiles?.[p.key]) {
+      div.classList.add('pile-raided');
+      div.insertAdjacentHTML('beforeend', '<div class="raided-tag">Raided!</div>');
+      div.addEventListener('click', () => toast(`The kaiju raided this pile! It's back next turn.`, 'error'));
+      container.appendChild(div);
+      return;
+    }
     div.addEventListener('click', () => {
-      SFX.play('select');
+      SFX.play('card_swish');
       socket.emit('shop_pick', { pileType: p.key });
       closeShop(true);
     });
@@ -2183,6 +2311,7 @@ function sendEndTurn() {
     }
   }
   sendEndTurn._warned = false;
+  SFX.play('card_swish');
   socket.emit('end_turn');
 }
 
@@ -2211,7 +2340,22 @@ function showMathChallenge(challenge) {
     return;
   }
 
-  // Attack, build, shop draw
+  // Attack, build, shop draw, boss raid
+  const title = document.getElementById('math-title');
+  title.classList.toggle('hidden', action !== 'raid');
+  if (action === 'raid') {
+    title.textContent = `🦖 Stop the raid!`;
+    const mc = document.getElementById('math-card');
+    mc.className = `math-big-card art-card ${card.type === 'attack' ? 'atk' : card.type === 'build' ? 'bld' : 'wld'}`;
+    mc.innerHTML = card.type === 'wild'
+      ? cardFace('back', { tone: 'wld', eq: card.eq, name: 'Wild' })
+      : faceForCard(card);
+    startTimer('timer-bar', 'timer-wrap');
+    showScreen('s-math');
+    introMathCard(document.getElementById('s-math'), 'flip');
+    document.getElementById('math-answer').value = '';
+    return;
+  }
   const mathCard = document.getElementById('math-card');
   mathCard.className = `math-big-card art-card ${card.type === 'attack' ? 'atk' : card.type === 'build' ? 'bld' : 'wld'}`;
   mathCard.innerHTML = faceForCard(card);
@@ -2228,12 +2372,13 @@ function startTimer(barId, wrapId) {
   const bar = document.getElementById(barId);
   const wrap = document.getElementById(wrapId);
 
-  if (myDifficulty === 1) {
+  const solo = gameState?.mode === 'solo';
+  if (!solo && myDifficulty === 1) {
     wrap.style.display = 'none';
     return;
   }
   wrap.style.display = '';
-  timerSeconds = DIFF_SECONDS[myDifficulty] || 5;
+  timerSeconds = (solo ? SOLO_SECONDS[myDifficulty] : DIFF_SECONDS[myDifficulty]) || 10;
 
   bar.style.transition = 'none';
   bar.style.width = '100%';
@@ -2249,6 +2394,7 @@ function startTimer(barId, wrapId) {
     if (pct < 30) bar.classList.add('danger');
     if (remaining > 0 && remaining <= Math.min(3, Math.ceil(timerSeconds * 0.3))) {
       document.querySelector('.screen.active .math-big-card')?.classList.add('urgent');
+      SFX.play('tick', 0.7);
     }
     if (remaining <= 0) {
       stopTimer();
@@ -2283,6 +2429,8 @@ function sendAnswer(answer) {
     socket.emit('solve_build', { cardId: ch.card.id, shieldSlotIndex: ch.context?.slotIndex, answer });
   } else if (ch.action === 'wild_resolve') {
     socket.emit('solve_wild_resolve', { cardId: ch.card.id, answer });
+  } else if (ch.action === 'raid') {
+    socket.emit('solve_raid', { answer });
   } else {
     socket.emit('solve_draw', { cardId: ch.card.id, answer }); // shop_draw + wild_draw
   }
@@ -2314,12 +2462,17 @@ function oppName() {
   return gameState?.players?.[oppId]?.name || 'Your opponent';
 }
 function resetRematchUI() {
+  document.getElementById('retry-btn').classList.add('hidden');
   const btn = document.getElementById('rematch-btn');
   btn.disabled = false; btn.classList.remove('hidden', 'pulse'); btn.textContent = '⚔️ Rematch';
   document.getElementById('leave-btn').classList.remove('btn-gold'); document.getElementById('leave-btn').classList.add('btn-ghost');
   document.getElementById('rematch-status').textContent = '';
 }
 function requestRematch() {
+  if (gameState?.mode === 'solo') {
+    const won = gameState.winner === myPlayerId;
+    return soloRestart(won && soloLevel < 3 ? soloLevel + 1 : soloLevel);
+  }
   SFX.play('select');
   const btn = document.getElementById('rematch-btn');
   btn.disabled = true; btn.classList.remove('pulse');
@@ -2364,6 +2517,7 @@ function resetForNewGame() {
   giftIds.clear(); suppressFlash.clear();
   renderGame._prevTurn = undefined; renderGame._prevActions = undefined;
   oppMood = 'normal';
+  bossMood = 'normal'; clearTimeout(bossMoodTimer); _prevBossHp = null;
   clearTimeout(moodTimer); moodTimer = null; moodHeld = false;
   myMoodNow = null; emitMood('normal');
   document.getElementById('s-gameover').classList.remove('lose');
@@ -2374,6 +2528,269 @@ function resetForNewGame() {
   cancelAnims(document.querySelector('#direct-attack-banner .final-ring'));
   document.querySelector('#direct-attack-banner .final-label').style.visibility = '';
   lastDirect = null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SOLO VS KAIJU
+//  One kid vs a boss with a health bar. The server runs the boss's turn.
+//  Kaiju art: /img/boss/<id>_<mood>.webp (animated loop, .png still fallback). Attack/heal/raid also play full screen (bossCutIn); game over uses the loop as background.
+//  Moods = normal, attack, raid, hurt, heal, defeated.
+//  Until the art exists, a tinted 🦖 placeholder is shown.
+// ═══════════════════════════════════════════════════════════════════════════
+const BOSS_LADDER = [
+  { level: 1, id: 'boss1', color: 'grey', name: 'Grey Kaiju', hp: 8,  weak: 'Hammer' },
+  { level: 2, id: 'boss2', color: 'blue', name: 'Blue Kaiju', hp: 10, weak: 'Gun' },
+  { level: 3, id: 'boss3', color: 'red',  name: 'Red Kaiju',  hp: 12, weak: 'Sword' },
+];
+const BOSS_MOODS = ['normal', 'attack', 'raid', 'hurt', 'heal', 'defeated'];
+// Timing (ms) — tune here
+const BOSS_CUTIN_MS   = 2500;  // full-screen attack / heal / raid moment (tap skips)
+const BOSS_MOOD_HOLD  = 2500;  // small portrait stays on a mood this long, then back to normal
+const BOSS_GO_INTRO_MS = 4300; // game over: one full pass of the loop before it dims and the buttons appear
+const SOLO_PROGRESS_KEY = 'mcg-solo-beaten';   // highest kaiju level beaten on this device
+let soloLevel = 1;
+let bossMood = 'normal', bossMoodTimer = null, _prevBossHp = null;
+
+function soloBeaten() { try { return Number(localStorage.getItem(SOLO_PROGRESS_KEY)) || 0; } catch (e) { return 0; } }
+function saveSoloBeaten(level) { try { if (level > soloBeaten()) localStorage.setItem(SOLO_PROGRESS_KEY, String(level)); } catch (e) {} }
+const bossColorOf = id => (BOSS_LADDER.find(b => b.id === id) || BOSS_LADDER[0]).color;
+
+function setBossPortrait(el, id, mood = 'normal', pop) {
+  if (!BOSS_MOODS.includes(mood)) mood = 'normal';
+  const src = `/img/boss/${id}_${mood}.webp`;   // animated loop; falls back to the .png still, then the 🦖
+  el.classList.add('boss-portrait');
+  el.dataset.boss = bossColorOf(id);
+  if (el.dataset.src === src) return;
+  el.dataset.src = src;
+  el.dataset.mood = mood;
+  el.innerHTML = `<span class="boss-ph">🦖</span><img alt="" src="${src}" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace(/\.webp$/,'.png')}else this.remove()">`;
+  if (pop && el.offsetParent) anim(el, [
+    { transform: 'scale(1)' }, { transform: 'scale(1.12) rotate(-3deg)' }, { transform: 'scale(1)' },
+  ], { duration: 360, easing: 'ease-out' });
+}
+function setBossMood(m, hold = BOSS_MOOD_HOLD) {
+  clearTimeout(bossMoodTimer);
+  bossMood = m;
+  const id = gameState?.boss?.id || 'boss1';
+  ['game-opp-avatar', 'wait-enemy-avatar', 'final-opp-avatar'].forEach(eid => setPortrait(document.getElementById(eid), id, m, true));
+  if (m !== 'normal' && m !== 'defeated') bossMoodTimer = setTimeout(() => setBossMood('normal'), hold);
+}
+
+function renderBossHp(state) {
+  const solo = state.mode === 'solo' && state.boss;
+  ['boss-hp', 'wait-boss-hp'].forEach(id => {
+    const el = document.getElementById(id);
+    el.classList.toggle('hidden', !solo);
+    if (!solo) return;
+    const { hp, maxHp, color } = state.boss;
+    el.dataset.boss = color;
+    el.querySelector('.boss-hp-fill').style.width = `${(hp / maxHp) * 100}%`;
+    el.querySelector('.boss-hp-text').textContent = `${hp} / ${maxHp} HP`;
+    el.classList.toggle('low', hp <= maxHp * 0.3);
+  });
+  if (solo) _prevBossHp = state.boss.hp;
+}
+
+function openSoloSetup() {
+  const nm = document.getElementById('solo-name');
+  if (!nm.value) nm.value = document.getElementById('host-name').value || document.getElementById('client-name').value || '';
+  buildAvatarPickers();
+  buildBossLadder();
+  showScreen('s-solo-setup');
+}
+
+function buildBossLadder() {
+  const beaten = soloBeaten();
+  const wrap = document.getElementById('boss-ladder');
+  wrap.innerHTML = '';
+  BOSS_LADDER.forEach(b => {
+    const locked = b.level > beaten + 1;
+    const done = b.level <= beaten;
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `boss-card${locked ? ' locked' : ''}${done ? ' beaten' : ''}`;
+    card.dataset.boss = b.color;
+    card.innerHTML = `<div class="avatar-portrait md"></div>
+      <div class="boss-card-name">${esc(b.name)}</div>
+      <div class="boss-card-info">${locked ? '🔒 Beat the one before' : `${b.hp} HP · Weak to ${b.weak}s`}</div>
+      ${done ? '<div class="boss-card-check">✓</div>' : ''}`;
+    setBossPortrait(card.querySelector('.avatar-portrait'), b.id, 'normal', false);
+    card.addEventListener('click', () => {
+      if (locked) { toast('Beat the kaiju before this one first!', 'info'); return; }
+      SFX.play('select');
+      soloStart(b.level);
+    });
+    wrap.appendChild(card);
+  });
+}
+
+function soloStart(level) {
+  const name = document.getElementById('solo-name').value.trim() || 'Player';
+  const difficulty = getSoloDiff ? getSoloDiff() : 1;
+  myDifficulty = difficulty;
+  soloLevel = level;
+  socket.emit('create_solo', { name, difficulty, avatar: myAvatar, level });
+}
+socket.on('solo_started', ({ playerId, level }) => {
+  myPlayerId = playerId;
+  soloLevel = level;
+  resetForNewGame();
+});
+
+function soloRestart(level) {
+  SFX.play('select');
+  soloLevel = level;
+  socket.emit('solo_restart', { level });
+}
+
+async function showSoloGameOver(winner) {
+  const won = winner === myPlayerId;
+  const bossName = gameState?.boss?.name || 'Kaiju';
+  if (won) saveSoloBeaten(soloLevel);
+  resetRematchUI();
+  const last = soloLevel >= 3;
+  document.getElementById('gameover-title').textContent = won ? '🏆 Kaiju Defeated!' : '💀 Knocked Out';
+  document.getElementById('gameover-sub').textContent = won
+    ? (last ? `You beat the ${bossName}! All three kaiju are down!` : `You beat the ${bossName}! The next kaiju is waiting...`)
+    : `The ${bossName} got you. You can do it, try again!`;
+  const btn = document.getElementById('rematch-btn');
+  const retry = document.getElementById('retry-btn');
+  if (won && !last) { btn.textContent = 'Next Kaiju ➜'; retry.classList.remove('hidden'); }
+  else if (won) { btn.textContent = '↻ Fight Again'; }
+  else { btn.textContent = '↻ Try Again'; }
+  document.getElementById('leave-btn').textContent = 'Back to Title';
+  const screen = document.getElementById('s-gameover');
+  const panel = screen.querySelector('.gameover-panel');
+  panel.classList.remove('win', 'lose');
+  screen.classList.remove('lose');
+  // Kaiju loop as the background: defeated if the kid won, idle if the kaiju won.
+  // First pass plays bright with just the title; then it dims and the buttons appear (tap skips).
+  const bossId = gameState?.boss?.id || 'boss1';
+  const bg = document.getElementById('kaiju-go-bg');
+  bg.onerror = () => { if (!bg.dataset.fb) { bg.dataset.fb = 1; bg.src = bg.src.replace(/\.webp$/, '.png'); } };
+  delete bg.dataset.fb;
+  bg.src = `/img/boss/${bossId}_${won ? 'defeated' : 'normal'}.webp`;
+  const blur = document.getElementById('kaiju-go-blur');
+  blur.onload = null; blur.src = bg.src;
+  bg.onload = () => { if (blur.src !== bg.src) blur.src = bg.src; };
+  screen.dataset.boss = bossColorOf(bossId);
+  screen.classList.add('kaiju-go', 'intro');
+  clearTimeout(screen._introTimer);
+  const endIntro = () => { clearTimeout(screen._introTimer); screen.classList.remove('intro'); screen.removeEventListener('click', endIntro); };
+  screen._introTimer = setTimeout(endIntro, BOSS_GO_INTRO_MS);
+  screen.addEventListener('click', endIntro);
+  showScreen('s-gameover');
+  if (won) { panel.classList.add('win'); SFX.play('win'); confetti(); setTimeout(confetti, 1600); }
+  else { panel.classList.add('lose'); screen.classList.add('lose'); SFX.play('lose'); }
+}
+
+// Floating "-2" over the kaiju
+function damagePop(x, y, text, color = '#ff4757') {
+  const d = document.createElement('div');
+  d.className = 'dmg-pop';
+  d.textContent = text;
+  d.style.left = x + 'px'; d.style.top = y + 'px'; d.style.color = color;
+  document.body.appendChild(d);
+  anim(d, [
+    { transform: 'translate(-50%,-50%) scale(0.4)', opacity: 0 },
+    { transform: 'translate(-50%,-90%) scale(1.3)', opacity: 1, offset: 0.3 },
+    { transform: 'translate(-50%,-170%) scale(1)', opacity: 0 },
+  ], { duration: 1100, easing: 'ease-out', fill: 'forwards' }).then(() => d.remove());
+}
+
+function bossFaceEl() {
+  const ids = ['final-opp-avatar', 'wait-enemy-avatar', 'game-opp-avatar'];
+  for (const id of ids) { const el = document.getElementById(id); if (el && el.offsetParent) return el; }
+  return null;
+}
+
+// Full-screen kaiju moment. Resolves after BOSS_CUTIN_MS or when tapped.
+function bossCutIn(mood, text) {
+  const id = gameState?.boss?.id || 'boss1';
+  const el = document.createElement('div');
+  el.className = 'kaiju-cutin';
+  el.dataset.boss = bossColorOf(id);
+  const fb = `onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace(/\\.webp$/,'.png')}else this.remove()"`;
+  const src = `/img/boss/${id}_${mood}.webp`;
+  el.innerHTML = `<img class="kaiju-blur" alt="" src="${src}" ${fb}><img class="kaiju-sharp" alt="" src="${src}" ${fb}><div class="kaiju-cutin-text"></div>`;
+  el.querySelector('.kaiju-cutin-text').textContent = text;
+  document.body.appendChild(el);
+  anim(el, [{ opacity: 0 }, { opacity: 1 }], { duration: 220, fill: 'forwards' });
+  anim(el.querySelector('.kaiju-sharp'), [
+    { transform: 'scale(0.6) rotate(-4deg)' }, { transform: 'scale(1.06) rotate(1deg)', offset: 0.7 }, { transform: 'scale(1)' },
+  ], { duration: 380, easing: 'cubic-bezier(.3,1.4,.5,1)' });
+  return new Promise(resolve => {
+    let done = false;
+    const close = () => {
+      if (done) return; done = true;
+      anim(el, [{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: 'forwards' }).then(() => { el.remove(); resolve(); });
+    };
+    el.addEventListener('click', close);
+    setTimeout(close, BOSS_CUTIN_MS);
+  });
+}
+
+async function fxBoss(fx) {
+  const face = bossFaceEl();
+  const c = face ? centerOf(face) : { x: window.innerWidth / 2, y: window.innerHeight * 0.3 };
+
+  if (fx.kind === 'boss_hit') {
+    if (fx.ko) { setBossMood('defeated'); await fxDirect(fx, true); return; }
+    lastDirect = null;
+    const proj = makeProjectile(fx.cardIcon, false, IMG[fx.cardSub]);
+    await flyProjectile(proj, c.x, c.y);
+    proj.el.remove();
+    SFX.play(WEAPON_SFX[fx.cardSub] || 'sword');
+    SFX.play('boss_hurt', 0.9);
+    if (fx.weak) SFX.play('crit');
+    setBossMood('hurt');
+    screenShake(fx.weak ? 16 : 9, 450);
+    burst(c.x, c.y, { count: fx.weak ? 34 : 18, dist: [60, 220], dur: 800 });
+    damagePop(c.x, c.y - 20, `-${fx.damage}`);
+    if (fx.weak) showTurnBanner('WEAK SPOT!', true);
+    if (face) anim(face, [
+      { transform: 'translateX(0)', filter: 'brightness(1)' },
+      { transform: 'translateX(-10px) rotate(-4deg)', filter: 'brightness(2) sepia(1) hue-rotate(-40deg) saturate(4)' },
+      { transform: 'translateX(8px) rotate(3deg)' }, { transform: 'translateX(0)', filter: 'brightness(1)' },
+    ], { duration: 420 });
+    await wait(500);
+  } else if (fx.kind === 'boss_attack' || fx.kind === 'boss_ko') {
+    setBossMood('attack');
+    SFX.play('boss_roar');
+    await bossCutIn('attack', fx.kind === 'boss_ko' ? '💥 KNOCKOUT!' : fx.charged ? '⚡ CHARGED SMASH!' : '🦖 SMASH!');
+    if (face) await anim(face, [
+      { transform: 'scale(1) translateY(0)' }, { transform: 'scale(0.9) translateY(-10px)', offset: 0.35 },
+      { transform: 'scale(1.3) translateY(40px)', offset: 0.7 }, { transform: 'scale(1) translateY(0)' },
+    ], { duration: 520, easing: 'ease-in' });
+    SFX.play('boss_slam');
+    if (fx.charged || fx.kind === 'boss_ko') SFX.play('boss_charged', 0.9);
+    screenShake(fx.charged || fx.kind === 'boss_ko' ? 20 : 12, 550);
+    screenFlash('rgba(176,30,44,0.45)', 450);
+    const containerId = document.getElementById('s-waiting').classList.contains('active') ? 'wait-own-shields' : 'own-shields';
+    const els = document.querySelectorAll(`#${containerId} .shield-card`);
+    if (fx.lostShields?.length) {
+      SFX.play('shieldBreak', 0.9);
+      await Promise.all(fx.lostShields.map((idx, i) => els[idx] ? wait(i * 160).then(() => breakShield(els[idx], containerId, idx)) : null));
+    }
+    await wait(300);
+  } else if (fx.kind === 'boss_heal') {
+    setBossMood('heal');
+    SFX.play('boss_heal');
+    await bossCutIn('heal', `💚 KAIJU HEALS! +${fx.amount}`);
+    burst(c.x, c.y, { count: 24, colors: ['#6effa0', '#1e7a34', '#c8f5d4'], dist: [40, 160], dur: 1000, gravity: -60 });
+    damagePop(c.x, c.y - 20, `+${fx.amount}`, '#6effa0');
+    await wait(700);
+  } else if (fx.kind === 'boss_raid') {
+    setBossMood('raid', 4000);
+    SFX.play('boss_raid');
+    await bossCutIn('raid', '🦖 SHOP RAID!');
+    await wait(200);
+  } else if (fx.kind === 'boss_raid_blocked') {
+    setBossMood('hurt');
+    showTurnBanner('🔮 RAID BLOCKED!', true);
+    SFX.play('positive', 0.7);
+    await wait(800);
+  }
 }
 
 // ─── Number pad (no iPad keyboard) ───────────────────────────────────────────
@@ -2389,7 +2806,7 @@ function padPress(screenId, key) {
   if (key === 'del') input.value = input.value.slice(0, -1);
   else if (key === 'clr') input.value = '';
   else if (input.value.length < MAX_DIGITS) input.value = (input.value === '0' ? '' : input.value) + key;
-  SFX.play('select', 0.45);
+  SFX.play('numpad', 0.8);
 }
 function buildNumpads() {
   Object.entries(ANSWER_INPUTS).forEach(([screenId, inputId]) => {

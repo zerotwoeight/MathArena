@@ -19,6 +19,9 @@ const EFFECTS = {
   red_potion(gs, playerId) {
     const had = gs.activeEffects[playerId].doublePower;
     gs.activeEffects[playerId].doublePower = true;
+    if (gs.isSolo) {
+      return { message: had ? '🧪 Red Potion! Still powered up (potions don\'t stack).' : '🧪 Red Potion! Your next attack does DOUBLE damage!', fx: {} };
+    }
     return {
       message: had
         ? '🧪 Red Potion! Still powered up (potions don\'t stack).'
@@ -100,6 +103,12 @@ const EFFECTS = {
 
   // Steal up to 2 random cards — only as many as fit in your hand, so nothing is lost.
   looking_glass(gs, playerId) {
+    // Solo: the boss has no hand, so the glass blocks its next shop raid instead
+    if (gs.isSolo) {
+      const had = gs.boss.raidBlocked;
+      gs.boss.raidBlocked = true;
+      return { message: had ? '🔮 Looking Glass! The shop is already protected.' : `🔮 Looking Glass! The ${gs.boss.name}'s next raid will fail!`, fx: {} };
+    }
     const oppId = playerId === 'p1' ? 'p2' : 'p1';
     const opp = gs.players[oppId];
     const room = gs.handSpace(playerId);

@@ -32,6 +32,8 @@ app.use(express.static(path.join(__dirname, 'public'), {
 
 // ─── Avatars & moods ─────────────────────────────────────────────────────────
 const MOODS = ['normal', 'attack', 'correct', 'wrong', 'worried', 'shopping'];
+const GameState = require('./game/GameState');
+const { chooseMove } = require('./game/boss');
 const cleanAvatar = a => (typeof a === 'string' && /^avatar\d{1,2}$/.test(a)) ? a : 'avatar1';
 
 // ─── Room state ───────────────────────────────────────────────────────────────
@@ -54,6 +56,7 @@ function endRoom(code, reason) {
   const room = rooms.get(code);
   if (!room) return;
   for (const pid of ['p1', 'p2']) clearTimeout(room.awayTimers?.[pid]);
+  room.raidResolve?.();
   io.to(code).emit('session_expired', { reason });
   io.in(code).socketsLeave(code);
   rooms.delete(code);
@@ -154,6 +157,64 @@ io.on('connection', (socket) => {
     });
   });
 
+  // ── create_solo: one kid vs a kaiju boss (no second device) ────────────────
+  socket.on('create_solo', ({ name, difficulty, avatar, level } = {}) => {
+    const roomCode = generateRoomCode();
+    const room = {
+      roomCode,
+      solo: { level: Math.min(3, Math.max(1, Number(level) || 1)) },
+      p1: socket.id,
+      p2: null,
+      p1Name: name || 'Player 1',
+      p2Name: null,
+      p1Diff: Math.min(5, Math.max(1, Number(difficulty) || 1)),
+      p2Diff: 1,
+      p1Avatar: cleanAvatar(avatar),
+      p2Avatar: 'avatar1',
+      state: null,
+      keys: { p1: newKey(), p2: null },
+      away: { p1: null, p2: null },
+      awayTimers: { p1: null, p2: null },
+      lastChallenge: { p1: null, p2: null },
+    };
+    rooms.set(roomCode, room);
+    socket.join(roomCode);
+    socket.roomCode = roomCode;
+    socket.playerId = 'p1';
+    room.state = new GameState(room);
+    room.p2Name = room.state.players.p2.name;
+    console.log(`[solo] ${roomCode} ${room.p1Name} vs ${room.p2Name}`);
+    socket.emit('session', { roomCode, playerId: 'p1', sessionKey: room.keys.p1 });
+    socket.emit('solo_started', { playerId: 'p1', level: room.solo.level });
+    socket.emit('game_state', { state: room.state.getPublicState() });
+  });
+
+  // ── solo_restart: Retry / Next Boss from the game over screen ─────────────
+  socket.on('solo_restart', ({ level } = {}) => {
+    const room = rooms.get(socket.roomCode);
+    if (!room?.solo || !room.state || room.state.phase !== 'gameover') return;
+    room.solo.level = Math.min(3, Math.max(1, Number(level) || room.solo.level));
+    room.raidResolve?.();
+    room.state = new GameState(room);
+    room.p2Name = room.state.players.p2.name;
+    room.lastChallenge = { p1: null, p2: null };
+    console.log(`[solo] ${socket.roomCode} restart level ${room.solo.level}`);
+    socket.emit('rematch_start', {});
+    socket.emit('game_state', { state: room.state.getPublicState() });
+  });
+
+  // ── solve_raid: the kid's answer to a boss shop raid ───────────────────────
+  socket.on('solve_raid', ({ answer } = {}) => {
+    const room = rooms.get(socket.roomCode);
+    if (!room?.state?.isSolo || isPaused(room)) return;
+    const result = room.state.solveRaid(socket.playerId, Number(answer));
+    if (!result) return;
+    handleActionResult(socket, room, result);
+    const done = room.raidResolve;
+    room.raidResolve = null;
+    done?.();
+  });
+
   // ── rejoin: a device that dropped comes back with its session key ─────────
   socket.on('rejoin', ({ roomCode, sessionKey } = {}) => {
     const code = String(roomCode || '').toUpperCase();
@@ -178,7 +239,7 @@ io.on('connection', (socket) => {
     room.away[pid] = null;
     console.log(`[rejoin] ${code} ${pid} (${socket.id})${wasAway ? '' : ' (quick)'}`);
 
-    socket.emit('rejoined', { playerId: pid, roomCode: code, inGame: !!room.state });
+    socket.emit('rejoined', { playerId: pid, roomCode: code, inGame: !!room.state, solo: room.solo || null });
 
     if (!room.state) {
       // Still in the lobby: replay what the lobby screens need
@@ -230,7 +291,6 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const GameState = require('./game/GameState');
     const gs = new GameState(room);
     room.state = gs;
 
@@ -334,7 +394,6 @@ io.on('connection', (socket) => {
     if (room.rematch.has('p1') && room.rematch.has('p2')) {
       const loser = room.state.winner === 'p1' ? 'p2' : 'p1';
       room.rematch = null;
-      const GameState = require('./game/GameState');
       const gs = new GameState(room);
       gs.currentTurn = loser;           // the player who lost goes first
       room.state = gs;
@@ -352,6 +411,7 @@ io.on('connection', (socket) => {
     const name = socket.playerId === 'p1' ? room.p1Name : room.p2Name;
     socket.to(code).emit('opponent_left', { name });
     for (const pid of ['p1', 'p2']) clearTimeout(room.awayTimers?.[pid]);
+    room.raidResolve?.();
     socket.leave(code);
     socket.roomCode = null;
     rooms.delete(code);
@@ -415,6 +475,78 @@ function handleActionResult(socket, room, result) {
   // Game over
   if (result.gameOver) {
     io.to(code).emit('game_over', { winner: result.gameOver });
+  }
+
+  // Solo: the kid's turn just ended → the boss takes its turn
+  if (room.state?.isSolo && room.state.phase === 'playing' && room.state.currentTurn === 'p2') runBossTurn(room);
+}
+
+// ─── Solo: the boss's turn ────────────────────────────────────────────────────
+// Runs on the server with short pauses so the kid can follow each move.
+// Waits while the kid's device is away, and waits for the kid's answer on a raid.
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const BOSS_START_MS = 1200;   // pause before the first move
+const BOSS_MOVE_MS  = 1600;   // pause between moves
+const RAID_GIVEUP_MS = 45000; // no raid answer at all (longest timer is 20s)
+
+function emitBoss(room, result) {
+  const code = room.roomCode;
+  if (result.message) io.to(code).emit('action_result', { type: result.type || 'info', message: result.message, actor: 'p2', fx: result.fx || null });
+  if (result.mathChallenge) {
+    room.lastChallenge.p1 = result.mathChallenge;
+    if (room.p1) io.to(room.p1).emit('math_challenge', result.mathChallenge);
+  }
+  if (result.stateUpdated) io.to(code).emit('game_state', { state: room.state.getPublicState() });
+  if (result.gameOver) io.to(code).emit('game_over', { winner: result.gameOver });
+}
+
+async function runBossTurn(room) {
+  if (room.bossRunning) return;
+  room.bossRunning = true;
+  const gs = room.state;
+  const alive = () => rooms.get(room.roomCode) === room && room.state === gs && gs.phase === 'playing';
+  const untilBack = async () => { while (alive() && isPaused(room)) await sleep(1000); };
+  try {
+    await sleep(BOSS_START_MS);
+    let healed = false, attacked = false;
+    for (let i = 0; i < gs.boss.actions; i++) {
+      await untilBack();
+      if (!alive()) return;
+      const move = chooseMove(gs, healed, attacked);
+      if (move === 'heal') { healed = true; emitBoss(room, gs.bossHeal()); }
+      else if (move === 'attack') { attacked = true; emitBoss(room, gs.bossAttack()); }
+      else {
+        const res = gs.bossRaidStart();
+        if (res.mathChallenge) {
+          const answered = new Promise(r => { room.raidResolve = r; });
+          emitBoss(room, res);
+          // solve_raid resolves this (rejoin re-sends the problem). Safety net: if no
+          // answer ever comes while the kid is connected, count it as wrong.
+          let waited = 0;
+          while (alive() && room.raidResolve) {
+            await Promise.race([answered, sleep(1000)]);
+            if (!isPaused(room)) waited += 1000;
+            if (room.raidResolve && waited > RAID_GIVEUP_MS) {
+              room.raidResolve = null;
+              const r = gs.solveRaid('p1', NaN);
+              if (r) emitBoss(room, r);
+            }
+          }
+        } else emitBoss(room, res);
+      }
+      if (!alive()) return;
+      gs.actionsLeft = Math.max(0, gs.actionsLeft - 1);
+      io.to(room.roomCode).emit('game_state', { state: gs.getPublicState() });
+      await sleep(BOSS_MOVE_MS);
+    }
+    await untilBack();
+    if (!alive()) return;
+    gs.endBossTurn();
+    io.to(room.roomCode).emit('game_state', { state: gs.getPublicState() });
+  } catch (e) {
+    console.error('[boss]', e);
+  } finally {
+    room.bossRunning = false;
   }
 }
 

@@ -5,6 +5,7 @@ const {
   drawStartingHand, buildStartingShields, MATCHUP, WILD_DEFS, makeEq,
 } = require('./cardData');
 const WILD_EFFECTS = require('./wildEffects');
+const { bossFor, makeBossEq } = require('./boss');
 
 const PILE_SIZE  = 20;
 const MAX_HAND   = 5;
@@ -55,13 +56,27 @@ class GameState {
       },
     };
 
-    // Each player gets problems at their own star level
-    this.players.p1.hand.forEach(c => this.fitCard(c, 'p1'));
-    this.players.p2.hand.forEach(c => this.fitCard(c, 'p2'));
-
     // Pending action context (for two-step interactions)
     this._pending = null;
+
+    // ── Solo mode: p2 is a kaiju boss with a health bar instead of shields
+    this.mode = room.solo ? 'solo' : 'versus';
+    this.lockedPiles = {};            // piles the boss raided: closed for the kid's next turn
+    this.boss = null;
+    if (room.solo) {
+      const def = bossFor(room.solo.level);
+      this.boss = { ...def, maxHp: def.hp, hp: def.hp, charged: false, raidBlocked: false };
+      this.players.p2 = {
+        socketId: null, name: def.name, avatar: def.id, isHost: false, hand: [], shields: [],
+      };
+    }
+
+    // Each player gets problems at their own star level (solo: the boss's math)
+    this.players.p1.hand.forEach(c => this.fitCard(c, 'p1'));
+    this.players.p2.hand.forEach(c => this.fitCard(c, 'p2'));
   }
+
+  get isSolo() { return this.mode === 'solo'; }
 
   // ─── Public state broadcast ────────────────────────────────────────────────
   getPublicState() {
@@ -71,6 +86,13 @@ class GameState {
       actionsLeft:  this.actionsLeft,
       round:        this.round,
       winner:       this.winner,
+      mode:         this.mode,
+      boss:         this.boss && {
+        level: this.boss.level, id: this.boss.id, color: this.boss.color, name: this.boss.name,
+        hp: this.boss.hp, maxHp: this.boss.maxHp, weak: this.boss.weak,
+        charged: this.boss.charged, raidBlocked: this.boss.raidBlocked,
+      },
+      lockedPiles:  this.lockedPiles,
       activeEffects: this.activeEffects,
       players: {
         p1: this._publicPlayer('p1'),
@@ -108,6 +130,16 @@ class GameState {
   // Re-rolls an attack/build card's problem to match this player's difficulty.
   // Called whenever a card is about to be shown to, or land in, a player's hand.
   fitCard(card, playerId) {
+    if (card && this.isSolo) {
+      // Solo: the boss sets the math, the stars only set the timer
+      const lvl = this.boss.level;
+      if (card.type === 'attack' || card.type === 'build') Object.assign(card, makeBossEq(lvl, card.type));
+      if (card.type === 'wild') {
+        const draw = makeBossEq(lvl, 'wild'), resolve = makeBossEq(lvl, 'wild');
+        Object.assign(card, { drawEq: draw.eq, drawAnswer: draw.answer, resolveEq: resolve.eq, resolveAnswer: resolve.answer });
+      }
+      return card;
+    }
     if (card && (card.type === 'attack' || card.type === 'build')) {
       const { eq, answer } = makeEq(this.difficulty[playerId] || 1);
       card.eq = eq;
@@ -181,8 +213,11 @@ class GameState {
     // Red Potion (doublePower) and Red Spell Book (noMath) are NOT reset here —
     // they stay active until the player uses them, even across turns.
 
+    // Solo: raided piles come back once the kid's turn is over
+    if (this.isSolo && cur === 'p1') this.lockedPiles = {};
+
     this.currentTurn = cur === 'p1' ? 'p2' : 'p1';
-    this.actionsLeft = ACTIONS_PER_TURN;
+    this.actionsLeft = this.isSolo && this.currentTurn === 'p2' ? this.boss.actions : ACTIONS_PER_TURN;
     if (this.currentTurn === 'p1') this.round++;
   }
 
@@ -202,6 +237,9 @@ class GameState {
     if (!this._isMyTurn(playerId)) return { type: 'error', message: "It's not your turn." };
     if (this.actionsLeft <= 0)     return { type: 'error', message: 'No actions left.' };
     if (!this.piles[pileType])     return { type: 'error', message: 'Unknown pile.' };
+    if (this.lockedPiles[pileType]) {
+      return { type: 'error', message: `The ${this.boss?.name || 'boss'} raided that pile! It's back next turn.` };
+    }
     if (pileType !== 'wild' && this.handSpace(playerId) <= 0) {
       return { type: 'error', message: 'Your hand is full! Play a card first.' };
     }
@@ -223,6 +261,12 @@ class GameState {
 
     const card = this.fitCard(this.peekPile(pileType), playerId);
     const action = pileType === 'wild' ? 'wild_draw' : 'shop_draw';
+    // Solo: buying an attack/build card has its own problem; the card keeps its own for playing
+    if (this.isSolo && action === 'shop_draw') {
+      const buy = makeBossEq(this.boss.level, 'buy');
+      this._pending = { playerId, action, pileType, card, buyAnswer: buy.answer };
+      return { mathChallenge: { card: { ...card, ...buy }, action, context: {} } };
+    }
     this._pending = { playerId, action, pileType, card };
     return { mathChallenge: { card, action, context: {} } };
   }
@@ -235,15 +279,16 @@ class GameState {
 
     const card = this.drawFromPile(p.pileType); // consume (same card that was peeked)
     const isWild = p.pileType === 'wild';
-    const correct = answer === (isWild ? card.drawAnswer : card.answer);
+    const expected = isWild ? card.drawAnswer : (p.buyAnswer ?? card.answer);
+    const correct = answer === expected;
 
     if (!correct) {
       this._useAction();
       return {
         type: 'error',
-        message: `✗ Wrong! Card discarded. The answer was ${isWild ? card.drawAnswer : card.answer}.`,
+        message: `✗ Wrong! Card discarded. The answer was ${expected}.`,
         stateUpdated: true,
-        fx: { kind: 'wrong', answer: isWild ? card.drawAnswer : card.answer },
+        fx: { kind: 'wrong', answer: expected },
       };
     }
 
@@ -330,6 +375,7 @@ class GameState {
 
     const oppId = this._oppId(playerId);
     const opp   = this.players[oppId];
+    if (this.isSolo) targetShieldIndex = -1;   // solo: every attack hits the boss
     const anyShield = opp.shields.some(w => w.active);
 
     // Attempted direct attack but shields remain
@@ -392,6 +438,8 @@ class GameState {
     const opp   = this.players[oppId];
     const me    = this.players[playerId];
 
+    if (this.isSolo) return this._hitBoss(playerId, card);
+
     // Direct attack (all shields gone)
     const anyShield = opp.shields.some(w => w.active);
     if (!anyShield) {
@@ -451,6 +499,107 @@ class GameState {
       stateUpdated: true,
       fx: { kind: 'blocked', cardSub: card.sub, cardIcon: card.icon, target: targetShieldIndex },
     };
+  }
+
+  // ─── Solo: the kid hits the boss ──────────────────────────────────────────
+  _hitBoss(playerId, card) {
+    const b = this.boss;
+    const weak = card.sub === b.weak;
+    let damage = weak ? 2 : 1;
+    const potion = this.activeEffects[playerId].doublePower;
+    if (potion) { damage *= 2; this.activeEffects[playerId].doublePower = false; }
+    b.hp = Math.max(0, b.hp - damage);
+    this._useAction();
+    const fx = { kind: 'boss_hit', cardSub: card.sub, cardIcon: card.icon, damage, weak, potion, ko: b.hp === 0 };
+    if (b.hp === 0) {
+      this.phase = 'gameover';
+      this.winner = playerId;
+      return { type: 'success', message: `💥 Knockout! The ${b.name} is defeated!`, stateUpdated: true, gameOver: playerId, fx };
+    }
+    let message = `⚔️ ${card.sub} hits the ${b.name} for ${damage}!`;
+    if (weak) message += ` It's weak to ${b.weak}s!`;
+    if (potion) message = '🧪 ' + message;
+    return { type: 'success', message, stateUpdated: true, fx };
+  }
+
+  // ─── Solo: boss moves (called by the server's boss turn loop) ─────────────
+  bossAttack() {
+    const b = this.boss;
+    const kid = this.players.p1;
+    if (!kid.shields.some(s => s.active)) {
+      this.phase = 'gameover';
+      this.winner = 'p2';
+      return { type: 'error', message: `💀 The ${b.name} knocks you out!`, stateUpdated: true, gameOver: 'p2', fx: { kind: 'boss_ko' } };
+    }
+    const charged = b.charged;
+    b.charged = false;
+    const lost = [];
+    for (let i = 0; i < (charged ? 2 : 1); i++) {
+      const idx = this.removeRandomShield('p1');
+      if (idx >= 0) lost.push(idx);
+    }
+    const message = charged
+      ? `⚡ Charged smash! The ${b.name} breaks ${lost.length} shield${lost.length === 1 ? '' : 's'}!`
+      : `🦖 The ${b.name} smashes a shield!`;
+    return { type: 'error', message, stateUpdated: true, fx: { kind: 'boss_attack', lostShields: lost, charged } };
+  }
+
+  bossHeal() {
+    const b = this.boss;
+    const before = b.hp;
+    b.hp = Math.min(b.maxHp, b.hp + b.heal);
+    return { type: 'info', message: `💚 The ${b.name} heals ${b.hp - before} HP.`, stateUpdated: true, fx: { kind: 'boss_heal', amount: b.hp - before } };
+  }
+
+  // Starts a raid: the kid gets a timed problem to defend the shop.
+  bossRaidStart() {
+    const b = this.boss;
+    const pileType = ['attack', 'build', 'wild'][Math.floor(Math.random() * 3)];
+    if (b.raidBlocked) {
+      b.raidBlocked = false;
+      return { type: 'success', message: `🔮 Your Looking Glass stopped the ${b.name}'s raid!`, stateUpdated: true, fx: { kind: 'boss_raid_blocked' } };
+    }
+    const top = this.peekPile(pileType);
+    // Raid math: mostly the boss's wild math, now and then an easier one
+    const card = { ...top, ...makeBossEq(b.level, 'raid') };
+    this._pending = { playerId: 'p1', action: 'raid', pileType, card };
+    return {
+      type: 'info',
+      message: `🦖 The ${b.name} is raiding the shop! Stop it!`,
+      fx: { kind: 'boss_raid', pileType },
+      mathChallenge: { card, action: 'raid', context: { pileType, bossName: b.name } },
+    };
+  }
+
+  solveRaid(playerId, answer) {
+    const p = this._pending;
+    if (!p || p.playerId !== playerId || p.action !== 'raid') return null;
+    this._pending = null;
+    const b = this.boss;
+    if (answer === p.card.answer) {
+      return { type: 'success', message: `🛡 Raid stopped! The ${b.name} got nothing.`, stateUpdated: true, fx: { kind: 'correct', raid: 'stopped' } };
+    }
+    this.drawFromPile(p.pileType);           // the boss takes it
+    this.lockedPiles[p.pileType] = true;     // gone from the shop for the kid's next turn
+    const gain = p.pileType === 'attack' ? 'charge'
+      : p.pileType === 'build' ? 'heal'
+      : (Math.random() < 0.5 ? 'charge' : 'heal');
+    let what;
+    if (gain === 'charge') { b.charged = true; what = 'Its next attack is charged!'; }
+    else { const before = b.hp; b.hp = Math.min(b.maxHp, b.hp + b.raidHeal); what = `It heals ${b.hp - before} HP!`; }
+    const pileName = { attack: 'Attack', build: 'Build', wild: 'Wild' }[p.pileType];
+    return {
+      type: 'error',
+      message: `✗ The ${b.name} grabbed a ${pileName} card! ${what} (Answer: ${p.card.answer})`,
+      stateUpdated: true,
+      fx: { kind: 'wrong', answer: p.card.answer, raid: 'lost', pileType: p.pileType, gain },
+    };
+  }
+
+  endBossTurn() {
+    this.currentTurn = 'p1';
+    this.actionsLeft = ACTIONS_PER_TURN;
+    this.round++;
   }
 
   // ─── Play build ────────────────────────────────────────────────────────────
